@@ -5,17 +5,22 @@
 # Dictionary where keys are unique identifiers used by agents in 'mcp_server_key'.
 mcp_servers:
   playwright_mcp: # Unique key for the Playwright server
-    # REQUIRED: URL for the server
-    url: "http://localhost:8931/sse"
-    # Optional: Name used in logs/tracing for this specific server instance
-    name: "Playwright MCP Server"
-    # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
-    # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
+    type: "sse" # sse / stdio
+    params:
+      # REQUIRED: URL for the server
+      url: "http://localhost:8931/sse"
+      # Optional: Name used in logs/tracing for this specific server instance
+      name: "Playwright MCP Server"
+      # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
+      # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
 
-  # memory_mcp:
-  #   url: "http://localhost:8932/sse"
-  #   name: "Memory MCP Server"
-
+  memory_mcp:
+    type: "stdio"
+    params:
+      command: "npx"
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-memory"
   # Add definitions for any other MCP servers your agents might need...
 # --- Define Agents ---
 agents:
@@ -33,6 +38,7 @@ agents:
       # Optional: Can still exist as a fallback if 'description' above is missing
       handoff_description: "Controls a web browser (navigation, screenshots, interaction)."
 
+
   - name: ProfileSpecialistAgent # This name WILL be used as the tool_name
     # Renamed field for tool description override:
     description: "Use this Agent to write special curated contents for LinkedIn profiles, or anything writing related."
@@ -46,19 +52,19 @@ agents:
       # Optional: Can still exist as a fallback if 'description' above is missing
       handoff_description: "Bearerer of the special content writing process."
 
-  # - name: MemoryAgent # This name WILL be used as the tool_name
-  #   # Renamed field for tool description override:
-  #   description: "Use this Agent to remember and recall information."
-  #   mcp_server_key: memory_mcp
-  #   parameters:
-  #     instructions: >
-  #       You are a Memory agent. Your task is to remember and recall information
-  #       as needed. You will assist the user in storing and retrieving important
-  #       details, notes, or any other relevant information.
-  #     model_settings:
-  #       tool_choice: required
-  #     # Optional: Can still exist as a fallback if 'description' above is missing
-  #     handoff_description: "Remembers and recalls information."
+  - name: MemoryAgent # This name WILL be used as the tool_name
+    # Renamed field for tool description override:
+    description: "Use this Agent to remember and recall information."
+    mcp_server_key: memory_mcp
+    parameters:
+      instructions: >
+        You are a Memory agent. Your task is to remember and recall information
+        as needed. You will assist the user in storing and retrieving important
+        details, notes, or any other relevant information.
+      model_settings:
+        tool_choice: required
+      # Optional: Can still exist as a fallback if 'description' above is missing
+      handoff_description: "Remembers and recalls information."
 
   - name: PlanningAgent # This name WILL be used as the tool_name
     # Renamed field for tool description override:

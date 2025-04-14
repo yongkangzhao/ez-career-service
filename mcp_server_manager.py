@@ -1,112 +1,125 @@
 # mcp_server_manager.py
-# (Code from the previous step, no changes needed for this refactor)
-from agents.mcp import MCPServerSse
+# Import BOTH server types
+from agents.mcp import MCPServerSse, MCPServerStdio
 import asyncio
-from typing import Dict, Any, Optional
+# Import Union for type hints
+from typing import Dict, Any, Optional, Union
+
+# Define a type alias for the union of possible server types for clarity
+AnyMCPServer = Union[MCPServerSse, MCPServerStdio]
 
 class MCPServerManager:
     """
-    Manages MULTIPLE named MCPServerSse connections concurrently
-    using an async context manager.
+    Manages MULTIPLE named MCPServerSse or MCPServerStdio connections concurrently
+    using an async context manager, based on YAML configuration.
     """
     def __init__(self, server_configs: Dict[str, Dict[str, Any]]):
-        """
-        Initializes the manager with configurations for multiple servers.
-        :param server_configs: Dict where keys are unique server identifiers
-                               and values are dicts of MCPServerSse params (url, name, headers, etc.).
-        """
         if not isinstance(server_configs, dict):
-             # Ensure input is a dictionary
-             raise TypeError(f"Expected server_configs to be a dict, got {type(server_configs)}")
+            raise TypeError(f"Expected server_configs to be a dict, got {type(server_configs)}")
 
-        self._configs = server_configs
-        # Stores the MCPServerSse context manager instances
-        self._active_contexts: Dict[str, MCPServerSse] = {}
-        # Stores the active server instances returned by __aenter__
-        self._active_servers: Dict[str, MCPServerSse] = {}
-        print(f"DEBUG: MCPServerManager initialized for servers: {list(self._configs.keys())}")
+        self._configs = {}
+        # Validate configurations upon initialization
+        for key, config in server_configs.items():
+            if not isinstance(config, dict):
+                print(f"WARNING: Config for '{key}' is not a dictionary. Skipping.")
+                continue
+            server_type = config.get('type')
+            params = config.get('params')
+            if server_type not in ['sse', 'stdio']:
+                print(f"WARNING: MCP Server config '{key}' has missing or invalid 'type'. Must be 'sse' or 'stdio'. Skipping.")
+                continue
+            if not isinstance(params, dict):
+                 print(f"WARNING: MCP Server config '{key}' is missing or has invalid 'params' dictionary. Skipping.")
+                 continue
+            # Basic check for required params based on type
+            if server_type == 'sse' and 'url' not in params:
+                 print(f"WARNING: SSE Server '{key}' missing 'url' in 'params'. Skipping.")
+                 continue
+            if server_type == 'stdio' and 'command' not in params:
+                 print(f"WARNING: Stdio Server '{key}' missing 'command' in 'params'. Skipping.")
+                 continue
+
+            # If valid, add to internal configs
+            self._configs[key] = config
+
+        if len(self._configs) != len(server_configs):
+            print("WARNING: Some invalid MCP server configurations were ignored during initialization.")
+
+        self._active_contexts: Dict[str, AnyMCPServer] = {} # Type hint updated
+        self._active_servers: Dict[str, AnyMCPServer] = {}  # Type hint updated
+        print(f"DEBUG: MCPServerManager initialized for valid servers: {list(self._configs.keys())}")
 
     async def _connect_server(self, server_key: str, config: Dict[str, Any]):
-        """Establishes connection for a single server."""
-        url = config.get('url')
-        if not url:
-            print(f"WARNING: Skipping connection for '{server_key}' due to missing URL in config.")
-            return None # Indicate skip explicitly
+        """Establishes connection for a single server based on its 'type'."""
+        server_type = config['type'] # Type guaranteed by __init__ filter
+        server_name = config.get('name', server_key)
+        server_params = config['params'] # Params dict guaranteed by __init__ filter
 
-        # Construct params dict for MCPServerSse, ensuring 'url' is included if not top-level
-        mcp_params = config.get('params', config).copy() # Prioritize 'params' dict if present
-        if 'url' not in mcp_params:
-             mcp_params['url'] = url # Ensure URL is in params dict for MCPServerSse
+        print(f"INFO: Attempting to connect to MCP Server '{server_key}' ({server_name}) using type '{server_type}'")
 
-        server_name = config.get('name', server_key) # Use provided name or key as fallback
+        context: Optional[AnyMCPServer] = None
 
-        print(f"INFO: Attempting to connect to MCP Server '{server_key}' ({server_name}) at {url}")
-        context = MCPServerSse(name=server_name, params=mcp_params)
+        # --- Instantiate correct class based on 'type' ---
+        if server_type == 'sse':
+            context = MCPServerSse(name=server_name, params=server_params)
+        elif server_type == 'stdio':
+            context = MCPServerStdio(name=server_name, params=server_params)
+        else:
+            # Should not happen if __init__ filtering is correct
+            raise ValueError(f"Internal Error: Unknown server type '{server_type}' encountered for '{server_key}'")
 
-        # Enter the context to establish the connection
+        # --- Enter Context (Same logic as before) ---
         try:
             server = await context.__aenter__()
             self._active_contexts[server_key] = context
             self._active_servers[server_key] = server
             print(f"INFO: MCP Server '{server_key}' connection established successfully.")
-            return server_key # Return key on success for tracking
+            return server_key
         except Exception as e:
-            print(f"ERROR: Failed connecting to '{server_key}': {e}")
-            # Attempt cleanup if context was created but __aenter__ failed
-            try:
-                # Ensure __aexit__ is called even if __aenter__ failed
-                await context.__aexit__(type(e), e, e.__traceback__)
-            except Exception as ae:
-                # Log error during cleanup, but prioritize original error
-                print(f"ERROR: Exception during cleanup for failed connection '{server_key}': {ae}")
-            raise # Re-raise the original connection error to signal failure
+            print(f"ERROR: Failed connecting to '{server_key}' (Type: {server_type}): {e}")
+            try: await context.__aexit__(type(e), e, e.__traceback__)
+            except Exception as ae: print(f"ERROR: Exception during cleanup for failed connection '{server_key}': {ae}")
+            raise # Re-raise original error
 
     async def __aenter__(self):
-        """Establishes connections to ALL configured MCP servers concurrently."""
+        """Establishes connections to ALL validly configured MCP servers concurrently."""
         if not self._configs:
-            print("INFO: MCPServerManager has no servers configured, nothing to connect.")
-            return self # Still return self, manager is active but manages no connections
+            print("INFO: MCPServerManager has no valid servers configured, nothing to connect.")
+            return self
 
         print("INFO: MCPServerManager entering context, connecting all configured servers...")
         connect_tasks = [
-            # Use asyncio.create_task for slightly better structure if needed, but list comprehension works
             self._connect_server(key, config)
-            for key, config in self._configs.items()
-            # Ensure we only try to connect those with a URL specified
-            if config.get('url')
+            for key, config in self._configs.items() # Iterate over validated configs
         ]
 
         if not connect_tasks:
-             print("INFO: No valid server configurations with URLs found to connect to.")
+             print("INFO: No valid server configurations found to connect to.")
              return self
 
-        # return_exceptions=True allows us to identify which ones failed without stopping others
         results = await asyncio.gather(*connect_tasks, return_exceptions=True)
 
-        # Check for any connection failures
         failed_servers = []
-        # Iterate through the original keys we *attempted* to connect
-        attempted_keys = [key for key, conf in self._configs.items() if conf.get('url')]
+        attempted_keys = list(self._configs.keys()) # Keys we attempted based on filtered config
         for i, key in enumerate(attempted_keys):
-            if isinstance(results[i], Exception):
-                # Error should have been logged in _connect_server
+            if i < len(results) and isinstance(results[i], Exception):
                 failed_servers.append(key)
 
         if failed_servers:
             print(f"ERROR: Cleaning up connections due to failures for: {failed_servers}")
-            # Attempt to clean up any servers that *did* connect successfully in this failed attempt
-            # Create a separate task for cleanup so we can raise the error promptly
             cleanup_task = asyncio.create_task(self.__aexit__(None, None, None))
-            await asyncio.sleep(0.1) # Give cleanup a moment to start
+            await asyncio.sleep(0.1)
             raise ConnectionError(f"Failed to connect to one or more MCP servers: {', '.join(failed_servers)}")
 
         print(f"INFO: All ({len(self._active_servers)}) configured MCP servers connected successfully.")
-        return self # Return the manager instance itself
+        return self
 
-    def get_server(self, server_key: str) -> MCPServerSse:
+    # --- Update Type Hint for get_server ---
+    def get_server(self, server_key: str) -> AnyMCPServer: # Use the Union type alias
         """
-        Retrieves a specific active server instance by its unique key.
-        Raises KeyError if the server key is invalid or the server is not connected.
+        Retrieves a specific active server instance (MCPServerSse or MCPServerStdio)
+        by its unique key. Raises KeyError if the server key is invalid or the
+        server is not connected.
         """
         if server_key not in self._active_servers:
             available_keys = list(self._active_servers.keys())
@@ -116,35 +129,17 @@ class MCPServerManager:
 
     async def __aexit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]):
         """Closes connections to ALL active MCP servers sequentially."""
+        # ... (No change needed in the sequential __aexit__ logic) ...
         print("INFO: MCPServerManager exiting context, disconnecting all active servers sequentially...")
-        if not self._active_contexts:
-            print("INFO: No active MCP server contexts to disconnect.")
-            return False # Nothing to do
-
+        if not self._active_contexts: print("INFO: No active MCP server contexts to disconnect."); return False
         disconnection_errors = False
-        # Use items() to iterate safely while potentially modifying dict indirectly later (clear)
         active_contexts_items = list(self._active_contexts.items())
-
         for key, context in active_contexts_items:
             print(f"DEBUG: Attempting sequential disconnection for '{key}'...")
-            try:
-                # Await __aexit__ directly for each context
-                await context.__aexit__(exc_type, exc_val, exc_tb)
-                print(f"DEBUG: Server '{key}' disconnected successfully.")
-            except Exception as e:
-                print(f"ERROR: Error during sequential disconnection of server '{key}': {e}")
-                disconnection_errors = True
-                # Decide if one failure should stop others? Probably not for cleanup.
-
-        # Clear internal state after attempting all disconnections
+            try: await context.__aexit__(exc_type, exc_val, exc_tb); print(f"DEBUG: Server '{key}' disconnected successfully.")
+            except Exception as e: print(f"ERROR: Error during sequential disconnection of server '{key}': {e}"); disconnection_errors = True
         active_server_count = len(self._active_servers)
-        self._active_contexts.clear()
-        self._active_servers.clear()
+        self._active_contexts.clear(); self._active_servers.clear()
         print(f"INFO: All ({active_server_count}) MCP server contexts cleared.")
-
-        # If disconnection errors occurred, maybe log differently or raise specific cleanup error?
-        if disconnection_errors:
-            print("WARNING: One or more errors occurred during MCP server disconnection.")
-
-        # Return False to propagate exceptions from within the 'with' block.
+        if disconnection_errors: print("WARNING: One or more errors occurred during MCP server disconnection.")
         return False

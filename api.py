@@ -2,7 +2,7 @@
 import os
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 from agents import Agent, ItemHelpers, MessageOutputItem, ModelSettings, Runner, trace
@@ -209,7 +209,7 @@ async def run_orchestration_endpoint(
 
     with trace(f"API Request - {request_trace_id}", trace_id=request_trace_id):
         try:
-            result = await Runner.run(orchestrator, payload.task)
+            result = await Runner.run(orchestrator, payload.task, max_turns=100)
             final_output = result.final_output
             if not final_output:
                 for item in reversed(result.new_items):
