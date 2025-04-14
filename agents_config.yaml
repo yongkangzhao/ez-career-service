@@ -1,0 +1,58 @@
+# agents_config.yaml
+# Single source for defining MCP servers and Agents to load.
+
+# --- Define MCP Servers ---
+# Dictionary where keys are unique identifiers used by agents in 'mcp_server_key'.
+mcp_servers:
+  playwright_mcp: # Unique key for the Playwright server
+    # REQUIRED: URL for the server
+    url: "http://localhost:8931/sse"
+    # Optional: Name used in logs/tracing for this specific server instance
+    name: "Playwright MCP Server"
+    # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
+    # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
+
+  # android_mcp: # Unique key for the Android server
+  #   url: "http://localhost:8932/sse"
+  #   name: "Android UI MCP Server"
+
+  # Add definitions for any other MCP servers your agents might need...
+
+
+# --- Define Agents ---
+# List of agents to be loaded automatically.
+agents:
+  # --- Browser Agent Definition ---
+  - name: BrowserToolAgent # Unique name for this agent instance
+    mcp_server_key: playwright_mcp # Connects to the 'playwright_mcp' server defined above
+    parameters: # Parameters passed to the standard Agent constructor
+      instructions: > # Using '>' for multi-line instructions
+        You are an expert browser controller. Precisely execute browser tasks
+        using the provided tools (like navigate, screenshot, click, input text).
+        Focus only on executing the requested browser action.
+      model_settings: # Nested dictionary for the ModelSettings object
+        tool_choice: required # MUST use tools because it interfaces via MCP
+        # temperature: 0.2 # Example: Lower temperature for precision
+      handoff_description: "Controls a web browser (navigation, screenshots, interaction)." # Description for the orchestrator
+
+  # --- Planning Agent Definition (Example without MCP) ---
+  - name: PlanningAgent
+    # No 'mcp_server_key' means this agent does not connect to any MCP server.
+    parameters:
+      instructions: >
+        Analyze the user's overall goal. Break it down into a logical sequence
+        of smaller, actionable steps. Each step should be clearly achievable by
+        one of the available tool agents (like the browser or android agent).
+        Present the plan clearly.
+      model_settings:
+        temperature: 0.4 # Slightly more creative for planning
+        # No tool_choice needed unless it uses function calls internally
+      handoff_description: "Creates step-by-step plans for complex tasks."
+
+  # --- Android Agent Definition (Example with MCP) ---
+  # - name: AndroidToolAgent
+  #   mcp_server_key: android_mcp # Connects to the 'android_mcp' server
+  #   parameters:
+  #     instructions: "You control an Android device's UI via specific tools (tap, swipe, get element text)."
+  #     model_settings: { tool_choice: required }
+  #     handoff_description: "Controls an Android device UI via MCP."
