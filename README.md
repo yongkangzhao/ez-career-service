@@ -112,9 +112,9 @@ If your `agents_config.yaml` defines agents requiring MCP servers (like `playwri
 * Open **a new terminal window** (leave the one running Chrome CDP open).
   * Run the following `npx` command, replacing `<PASTE_YOUR_CDP_ENDPOINT_URL_HERE>` with the full `ws://...` URL you copied from the Chrome terminal output:
 
-        ```bash
-        npx @playwright/mcp@latest --port 8931 --cdp-endpoint <PASTE_YOUR_CDP_ENDPOINT_URL_HERE>
-        ```
+       ```bash
+       npx @playwright/mcp@latest --port 8931 --cdp-endpoint <PASTE_YOUR_CDP_ENDPOINT_URL_HERE>
+       ```
 
   * Ensure `--port 8931` specifies the port the MCP server will listen on. This **must match** the port in the `url` specified for `playwright_mcp` in your `agents_config.yaml`.
   * Leave this terminal running. It is now acting as the bridge between the agent framework and the browser.
