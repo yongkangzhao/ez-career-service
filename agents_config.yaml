@@ -12,10 +12,6 @@ mcp_servers:
     # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
     # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
 
-  # android_mcp: # Unique key for the Android server
-  #   url: "http://localhost:8932/sse"
-  #   name: "Android UI MCP Server"
-
   # Add definitions for any other MCP servers your agents might need...
 
 
@@ -42,17 +38,9 @@ agents:
       instructions: >
         Analyze the user's overall goal. Break it down into a logical sequence
         of smaller, actionable steps. Each step should be clearly achievable by
-        one of the available tool agents (like the browser or android agent).
+        one of the available tool agents (like the browser agent).
         Present the plan clearly.
       model_settings:
         temperature: 0.4 # Slightly more creative for planning
         # No tool_choice needed unless it uses function calls internally
       handoff_description: "Creates step-by-step plans for complex tasks."
-
-  # --- Android Agent Definition (Example with MCP) ---
-  # - name: AndroidToolAgent
-  #   mcp_server_key: android_mcp # Connects to the 'android_mcp' server
-  #   parameters:
-  #     instructions: "You control an Android device's UI via specific tools (tap, swipe, get element text)."
-  #     model_settings: { tool_choice: required }
-  #     handoff_description: "Controls an Android device UI via MCP."
