@@ -85,23 +85,23 @@ If your `agents_config.yaml` defines agents requiring MCP servers (like `playwri
 
     * **On macOS:**
 
-            ```bash
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
-            ```
+         ```bash
+         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
+         ```
 
     * **On Linux:** (Path may vary)
 
-            ```bash
-            google-chrome --remote-debugging-port=9222
-            # or chromium-browser --remote-debugging-port=9222
-            ```
+         ```bash
+         google-chrome --remote-debugging-port=9222
+         # or chromium-browser --remote-debugging-port=9222
+         ```
 
     * **On Windows:** (Path may vary)
 
-            ```bash
-            "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
-            # Or "C:\Program Files (x86)\..."
-            ```
+         ```bash
+         "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+         # Or "C:\Program Files (x86)\..."
+         ```
 
   * This will launch Chrome. Look in the **terminal output** where you ran the command. You should see a line like:
         `DevTools listening on ws://127.0.0.1:9222/devtools/browser/SOME-UNIQUE-ID`
