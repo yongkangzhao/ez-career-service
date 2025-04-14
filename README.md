@@ -85,23 +85,23 @@ If your `agents_config.yaml` defines agents requiring MCP servers (like `playwri
 
     * **On macOS:**
 
-            ```bash
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
-            ```
+         ```bash
+         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
+         ```
 
     * **On Linux:** (Path may vary)
 
-            ```bash
-            google-chrome --remote-debugging-port=9222
-            # or chromium-browser --remote-debugging-port=9222
-            ```
+         ```bash
+         google-chrome --remote-debugging-port=9222
+         # or chromium-browser --remote-debugging-port=9222
+         ```
 
     * **On Windows:** (Path may vary)
 
-            ```bash
-            "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
-            # Or "C:\Program Files (x86)\..."
-            ```
+         ```bash
+         "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+         # Or "C:\Program Files (x86)\..."
+         ```
 
   * This will launch Chrome. Look in the **terminal output** where you ran the command. You should see a line like:
         `DevTools listening on ws://127.0.0.1:9222/devtools/browser/SOME-UNIQUE-ID`
@@ -112,9 +112,9 @@ If your `agents_config.yaml` defines agents requiring MCP servers (like `playwri
 * Open **a new terminal window** (leave the one running Chrome CDP open).
   * Run the following `npx` command, replacing `<PASTE_YOUR_CDP_ENDPOINT_URL_HERE>` with the full `ws://...` URL you copied from the Chrome terminal output:
 
-        ```bash
-        npx @playwright/mcp@latest --port 8931 --cdp-endpoint <PASTE_YOUR_CDP_ENDPOINT_URL_HERE>
-        ```
+       ```bash
+       npx @playwright/mcp@latest --port 8931 --cdp-endpoint <PASTE_YOUR_CDP_ENDPOINT_URL_HERE>
+       ```
 
   * Ensure `--port 8931` specifies the port the MCP server will listen on. This **must match** the port in the `url` specified for `playwright_mcp` in your `agents_config.yaml`.
   * Leave this terminal running. It is now acting as the bridge between the agent framework and the browser.
