@@ -1,5 +1,9 @@
 # api.py
 import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple, Union
