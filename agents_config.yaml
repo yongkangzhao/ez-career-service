@@ -13,27 +13,39 @@ mcp_servers:
     # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
 
   # Add definitions for any other MCP servers your agents might need...
-
-
 # --- Define Agents ---
-# List of agents to be loaded automatically.
 agents:
-  # --- Browser Agent Definition ---
-  - name: BrowserToolAgent # Unique name for this agent instance
-    mcp_server_key: playwright_mcp # Connects to the 'playwright_mcp' server defined above
-    parameters: # Parameters passed to the standard Agent constructor
-      instructions: > # Using '>' for multi-line instructions
+  - name: BrowserToolAgent # This name WILL be used as the tool_name
+    mcp_server_key: playwright_mcp
+    # Renamed field for tool description override:
+    description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
+    parameters:
+      instructions: >
         You are an expert browser controller. Precisely execute browser tasks
         using the provided tools (like navigate, screenshot, click, input text).
         Focus only on executing the requested browser action.
-      model_settings: # Nested dictionary for the ModelSettings object
-        tool_choice: required # MUST use tools because it interfaces via MCP
-        # temperature: 0.2 # Example: Lower temperature for precision
-      handoff_description: "Controls a web browser (navigation, screenshots, interaction)." # Description for the orchestrator
+      model_settings:
+        tool_choice: required
+      # Optional: Can still exist as a fallback if 'description' above is missing
+      handoff_description: "Controls a web browser (navigation, screenshots, interaction)."
 
-  # --- Planning Agent Definition (Example without MCP) ---
-  - name: PlanningAgent
-    # No 'mcp_server_key' means this agent does not connect to any MCP server.
+  - name: ProfileSpecialistAgent # This name WILL be used as the tool_name
+    # Renamed field for tool description override:
+    description: "Use this Agent to write special curated contents for LinkedIn profiles, or anything writing related."
+    parameters:
+      instructions: >
+        You are a Profile specialist. Your task is to assist the user
+        in writing and curating content for their LinkedIn profile.
+        You will provide suggestions, edits, and improvements to the user's profile content.
+      model_settings:
+        tool_choice: required
+      # Optional: Can still exist as a fallback if 'description' above is missing
+      handoff_description: "Bearerer of the special content writing process."
+
+
+  - name: PlanningAgent # This name WILL be used as the tool_name
+    # Renamed field for tool description override:
+    description: "Use this Agent to break down a complex goal into smaller steps understandable by other tools."
     parameters:
       instructions: >
         Analyze the user's overall goal. Break it down into a logical sequence
@@ -41,6 +53,6 @@ agents:
         one of the available tool agents (like the browser agent).
         Present the plan clearly.
       model_settings:
-        temperature: 0.4 # Slightly more creative for planning
-        # No tool_choice needed unless it uses function calls internally
-      handoff_description: "Creates step-by-step plans for complex tasks."
+        temperature: 0.4
+      # Optional fallback:
+      handoff_description: "Creates step-by-step plans."

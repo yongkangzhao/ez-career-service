@@ -1,92 +1,96 @@
-# agents/orchestrator_agent.py
-# (Code from the previous step, no changes needed for this refactor)
+# tool_agents/orchestrator_agent.py
 from agents import Agent
-from typing import List, Optional # Ensure List/Optional type hints are imported
+from typing import List, Dict, Any, Tuple, Optional
 
-# Optional: Define preferred tool names/descriptions for specific agent names
-# This allows overriding the auto-generated ones if desired.
-TOOL_METADATA_OVERRIDES = {
-    "BrowserToolAgent": {
-        "tool_name": "browser_control", # Shorter, more user-friendly tool name
-        "tool_description": "Use this tool to control a web browser: navigate, screenshot, click, input text etc."
-    },
-    "PlanningAgent": {
-         "tool_name": "task_planner",
-         "tool_description": "Use this tool to break down a complex goal into smaller steps."
-    }
-    # Add overrides for other specific agent names here if needed
-}
+# --- REMOVED TOOL_METADATA_OVERRIDES ---
 
-def create_orchestrator_agent(tool_agents: List[Agent]) -> Agent:
+def create_orchestrator_agent(
+    # Expect a list of tuples: (agent_instance, tool_metadata_dict)
+    # The dict now contains {'description': ...}
+    tool_agent_configs: List[Tuple[Agent, Dict[str, Any]]]
+    ) -> Agent:
     """
     Factory function to create the orchestrator agent.
-    Accepts a list of Agent objects that will be converted internally into tools.
+    Accepts a list of tuples, each containing an Agent instance
+    and a dictionary with its desired tool description override ('description').
+    The agent's 'name' is always used as the tool_name.
     """
-    if not tool_agents:
+    if not tool_agent_configs:
         print("WARNING: Creating OrchestratorAgent with no tool agents provided.")
 
-    print(f"DEBUG: Creating OrchestratorAgent from agents: {[a.name for a in tool_agents]}")
+    agent_names = [getattr(agent, 'name', 'Unnamed') for agent, meta in tool_agent_configs]
+    print(f"DEBUG: Creating OrchestratorAgent from agents: {agent_names}")
 
     tools_list: List = []
     tool_descriptions_for_instructions = []
 
-    for agent in tool_agents:
-        # Ensure agent has a name attribute
+    for agent, tool_meta in tool_agent_configs:
+        # --- Tool Name: Always use the agent's actual name ---
         agent_name = getattr(agent, 'name', 'UnnamedAgent')
+        tool_name_to_use = agent_name # Direct assignment
 
-        # --- Tool Metadata Generation ---
-        override = TOOL_METADATA_OVERRIDES.get(agent_name)
-        if override:
-            tool_name = override.get('tool_name', f"{agent_name}_as_tool") # Use override or default format
-            tool_description = override.get('tool_description', f"Activate the {agent_name} agent.")
-            print(f"DEBUG: Using override metadata for agent '{agent_name}'.")
-        else:
-            # Default generation if no override
-            tool_name = f"{agent_name}_as_tool" # Default tool name format
-            # Prefer the agent's handoff_description if available and non-empty.
-            tool_description = getattr(agent, 'handoff_description', None)
-            if not tool_description: # Checks for None or empty string
-                tool_description = f"Activates the {agent_name} agent to perform its specialized task."
-                print(f"DEBUG: No handoff_description or override for agent '{agent_name}'. Using generic description.")
-            # else: No need for else, description is already set
-            #     print(f"DEBUG: Using handoff_description for agent '{agent_name}'.")
+        # --- Tool Description Generation ---
+        # 1. Prioritize 'description' from YAML (via tool_meta)
+        tool_description_to_use = tool_meta.get('description') # Fetches value associated with 'description' key
 
+        # 2. Fallback to agent's handoff_description if YAML description is missing
+        if not tool_description_to_use:
+            tool_description_to_use = getattr(agent, 'handoff_description', None)
+            if tool_description_to_use:
+                print(f"DEBUG: No 'description' in YAML for agent '{agent_name}'. Using fallback 'handoff_description'.")
+            else:
+                # 3. Generate generic default if both are missing
+                tool_description_to_use = f"Activates the {agent_name} agent to perform its specialized task."
+                print(f"DEBUG: No 'description' or 'handoff_description' found for agent '{agent_name}'. Using generic description.")
+        # else: Description from YAML was found and assigned
 
-        print(f"DEBUG: Converting agent '{agent_name}' to tool '{tool_name}' with description: '{tool_description}'")
-        # Convert the agent to an AgentTool instance here
+        print(f"DEBUG: Converting agent '{agent_name}' to tool '{tool_name_to_use}' with description: '{tool_description_to_use}'")
         try:
-            # Ensure parameters passed to as_tool are correct
             agent_tool = agent.as_tool(
-                tool_name=tool_name,
-                tool_description=tool_description,
+                tool_name=tool_name_to_use, # Use agent's actual name
+                tool_description=tool_description_to_use, # Use determined description
             )
             tools_list.append(agent_tool)
-            # Use the final tool name and description for the orchestrator's instructions
-            tool_descriptions_for_instructions.append(f"- {tool_name}: {tool_description}")
+            tool_descriptions_for_instructions.append(f"- {tool_name_to_use}: {tool_description_to_use}")
         except Exception as e:
             print(f"ERROR: Failed to convert agent '{agent_name}' to tool. Error: {e}")
-            # Depending on desired robustness, either skip or raise
-            # continue # Option: Skip this agent if conversion fails
             raise RuntimeError(f"Failed to convert agent '{agent_name}' to tool") from e
-
 
     if not tools_list:
          print("WARNING: Orchestrator created with no tools!")
 
-    # Dynamically build instructions based on the created tools
     tool_details = "\n".join(tool_descriptions_for_instructions) if tools_list else "No tools available."
 
-    # Return the configured orchestrator agent
     return Agent(
-        name="TaskOrchestratorAgent", # Can make this name configurable too if needed
-        instructions=(
-            "You are a master orchestrator. Your goal is to accomplish the user's overall task "
-            "by deciding which specialized tool agent to activate and when. You have the following tools available:\n"
-            f"{tool_details}\n\n"
-            "Analyze the user's request and the current situation. Select the single best tool "
-            "to make progress towards the goal. Explain your choice briefly. "
-            "Execute the chosen tool. Report the final outcome clearly after the tool execution is complete."
-        ),
-        tools=tools_list, # Pass the list of created AgentTool objects
-        # Orchestrator decides, so usually no tool_choice='required' unless it ONLY delegates
+        name="TaskOrchestratorAgent",
+        instructions = (f"""
+        **Your Role: Master Orchestrator & Project Manage
+        You are responsible for managing a team of specialized agents (tools) to accomplish complex user goals, such as automating job applications. Your primary objective is to **fully satisfy the user's request through persistent, step-by-step execution.**\n
+        **Available Tools:**
+        You have access to the following specialized agents, usable as tools:
+
+        "{tool_details}"
+        
+        **Your Workflow & Responsibilities:**
+        1.  **Deconstruct the Request:** Carefully analyze the user's request. Identify the ultimate goal and break it down into a logical sequence of sub-tasks or steps. **Do not assume the task can be done in one step.** For complex tasks like job applications, anticipate multiple stages (e.g., search, filter, analyze details, interact with forms).
+        2.  **Strategic Tool Selection:** For *each* step in your plan, select the *single most appropriate tool* from the available list. Use the tool descriptions provided above to make an informed decision. Choose the tool best suited for the specific sub-task at hand.
+        3.  **Formulate Precise Tool Instructions:** This is critical. When you decide to use a tool, you must provide it with **clear, specific, detailed, and unambiguous instructions.**
+            * Include ALL necessary information the tool needs, based on the current step, user request, and information gathered from previous steps.
+            * If invoking `browser_control`, specify exact URLs, precise actions (click selector, input text into selector), and the text to input.
+            * If invoking `task_planner`, clearly state the goal that needs planning.
+            * **Avoid vague commands.** Think like you are writing a command for a script; precision is key.
+        4.  **Execute and Monitor:** Activate the chosen tool with your precise instructions.
+        5.  **Analyze Tool Output Critically:** Examine the result returned by the tool.
+            * **Success:** Did the tool successfully complete the sub-task? Does the result contain the information needed for the next step or to complete the overall goal? If the overall goal is not yet met, use the result to formulate the instructions for the **next logical step** in your plan.
+            * **Partial Success/Info:** Did the tool provide useful information but not complete the sub-task? Use this information to refine your plan or instructions for the next step.
+            * **Failure/Error:** Did the tool report an error? Analyze the error message. Can the step be retried with slightly different instructions (e.g., a corrected selector for the browser)? Should a different tool be used? Can the plan be adapted? **Do not give up immediately.** Try to overcome obstacles reasonably.
+        6.  **Iterate and Maintain Context:** Repeat steps 2-5, using the results and context from previous steps to inform the next action. Keep track of what has been done and what information has been gathered.
+        7.  **Report Progress & Completion:** Briefly explain your chosen action *before* executing a tool. Provide informative updates to the user, especially after a significant step or if encountering difficulties. When the *entire original user request* is fully satisfied, clearly state that the task is complete and provide the final result.\n
+        **Important Constraints:**
+        - **Use ONLY the provided tools.** Do not perform tasks directly if a tool exists (e.g., don't browse the web yourself, use the `browser_control` tool).
+        - **Stay Focused:** Adhere strictly to completing the user's request. Do not get sidetracked or perform unrelated actions.
+        - **Be Persistent:** Your goal is completion. If a step fails, analyze, adapt, and retry or replan where appropriat.
+        """
+    ),
+        tools=tools_list,
     )
