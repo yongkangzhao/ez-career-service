@@ -5,6 +5,7 @@
 Tired of the endless grind of finding and applying for jobs in competitive markets like Silicon Valley and beyond? **EZ-Career** introduces a **state-of-the-art backend service** designed to power an **autonomous job application system**. Forget manual searching and tedious form-filling – leverage the power of collaborative AI agents to manage your job hunt efficiently, reduce stress, and put your application process on easy mode!
 
 At its core, this service employs a sophisticated **multi-agent architecture**. Instead of a single monolithic AI, it utilizes a team of specialized agents, each expert in a specific domain, working together to achieve complex goals:
+
 * **Browser Agents:** Intelligently navigate complex job boards and application portals (like LinkedIn, Google Careers, Indeed), interact precisely with web elements, and fill out forms accurately. This grounding in real-world action is achieved via the **Message Control Protocol (MCP)** connecting to tools like Playwright.
 * **Planning Agents:** Analyze high-level user goals (e.g., "find Senior ML Engineer roles in Milpitas matching my resume") and exhibit **dynamic planning capabilities**. They devise multi-step strategies, breaking down the task into logical sub-goals executable by other specialized agents.
 * *(Future Agents):* The architecture is designed for extension with agents specializing in Resume Parsing (understanding your unique skills), Cover Letter Generation (tailoring applications), interaction with specific Job Board APIs, Application Tracking, and more!
@@ -38,31 +39,38 @@ While currently establishing the core multi-agent framework, orchestration logic
 * **Python:** Version 3.12 or higher (check `pyproject.toml`).
 * **uv:** Recommended Python package manager (`pip install uv`).
 * **Node.js & npm:** Required for `npx` to run the Playwright MCP server.
-    * Install Node.js (LTS recommended) from [https://nodejs.org/](https://nodejs.org/). `npm` is included.
-    * Verify: `node -v && npm -v`.
+  * Install Node.js (LTS recommended) from [https://nodejs.org/](https://nodejs.org/). `npm` is included.
+  * Verify: `node -v && npm -v`.
 * **Google Chrome:** Required for the Playwright MCP server to interact with websites.
 * **Git:** (Optional) For cloning the repository.
 
 ### 2. Project Installation
 
-1.  **Clone/Download:** Get the project files.
+1. **Clone/Download:** Get the project files.
+
     ```bash
     cd ez-career-service
     ```
-2.  **Create & Activate Virtual Environment (using `uv`):**
+
+2. **Create & Activate Virtual Environment (using `uv`):**
+
     ```bash
     uv venv
     source .venv/bin/activate # Linux/macOS (or equivalent)
     ```
-3.  **Install Python Dependencies (using `uv`):**
+
+3. **Install Python Dependencies (using `uv`):**
+
     ```bash
     uv pip install .
     ```
+
     *(Ensure `PyYAML>=6.0` is listed in `pyproject.toml` dependencies).*
 
 ### 3. Configure `agents_config.yaml`
 
 This file defines the infrastructure and agents.
+
 * **`mcp_servers`**: Define necessary MCP servers (like `playwright_mcp`). Ensure the `url` (e.g., `http://localhost:8931/sse`) matches the port the server will run on.
 * **`agents`**: Define agents like `BrowserToolAgent` (for web interaction), `PlanningAgent` (for strategy), or future agents. Set `mcp_server_key` for agents needing browser/device control. Configure `parameters` (`instructions`, `model_settings`, `handoff_description`).
 
@@ -73,41 +81,51 @@ If your `agents_config.yaml` defines agents requiring MCP servers (like `playwri
 **A. Start Chrome in Remote Debugging (CDP) Mode:**
 
 * **IMPORTANT:** Ensure all other instances of Google Chrome are **completely closed** before running this command.
-    * Open your terminal and run the command appropriate for your Operating System. You might need to adjust the path to your Chrome executable:
+  * Open your terminal and run the command appropriate for your Operating System. You might need to adjust the path to your Chrome executable:
 
-        * **On macOS:**
+    * **On macOS:**
+
             ```bash
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
             ```
-        * **On Linux:** (Path may vary)
+
+    * **On Linux:** (Path may vary)
+
             ```bash
             google-chrome --remote-debugging-port=9222
             # or chromium-browser --remote-debugging-port=9222
             ```
-        * **On Windows:** (Path may vary)
+
+    * **On Windows:** (Path may vary)
+
             ```bash
             "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
             # Or "C:\Program Files (x86)\..."
             ```
-    * This will launch Chrome. Look in the **terminal output** where you ran the command. You should see a line like:
+
+  * This will launch Chrome. Look in the **terminal output** where you ran the command. You should see a line like:
         `DevTools listening on ws://127.0.0.1:9222/devtools/browser/SOME-UNIQUE-ID`
-    * **Copy this entire `ws://...` URL.** You will need it for the next step. The `SOME-UNIQUE-ID` part changes every time.
+  * **Copy this entire `ws://...` URL.** You will need it for the next step. The `SOME-UNIQUE-ID` part changes every time.
 
 **B. Start the Playwright MCP Server:**
 
 * Open **a new terminal window** (leave the one running Chrome CDP open).
-    * Run the following `npx` command, replacing `<PASTE_YOUR_CDP_ENDPOINT_URL_HERE>` with the full `ws://...` URL you copied from the Chrome terminal output:
+  * Run the following `npx` command, replacing `<PASTE_YOUR_CDP_ENDPOINT_URL_HERE>` with the full `ws://...` URL you copied from the Chrome terminal output:
+
         ```bash
         npx @playwright/mcp@latest --port 8931 --cdp-endpoint <PASTE_YOUR_CDP_ENDPOINT_URL_HERE>
         ```
-    * Ensure `--port 8931` specifies the port the MCP server will listen on. This **must match** the port in the `url` specified for `playwright_mcp` in your `agents_config.yaml`.
-    * Leave this terminal running. It is now acting as the bridge between the agent framework and the browser.
+
+  * Ensure `--port 8931` specifies the port the MCP server will listen on. This **must match** the port in the `url` specified for `playwright_mcp` in your `agents_config.yaml`.
+  * Leave this terminal running. It is now acting as the bridge between the agent framework and the browser.
 
 *(Repeat similar steps for any other MCP servers defined in your config, following their specific startup instructions).*
+
 ## Running the Service
 
-1.  **Prerequisites:** Ensure Python venv is active, dependencies installed, and required MCP servers are running.
-2.  **Start FastAPI Service:**
+1. **Prerequisites:** Ensure Python venv is active, dependencies installed, and required MCP servers are running.
+2. **Start FastAPI Service:**
+
     ```bash
     # Development (auto-reload)
     uvicorn api:app --reload --host 0.0.0.0 --port 8000
@@ -115,13 +133,14 @@ If your `agents_config.yaml` defines agents requiring MCP servers (like `playwri
     # Production
     # uvicorn api:app --host 0.0.0.0 --port 8000
     ```
+
     The application will start, connect to MCP servers, load agents, and create the orchestrator.
 
 ## Order of Operations & Reconnection
 
-1.  Start Chrome (CDP Mode).
-2.  Start Playwright MCP Server (connected to Chrome).
-3.  Start this FastAPI application (`uvicorn api:app ...`).
+1. Start Chrome (CDP Mode).
+2. Start Playwright MCP Server (connected to Chrome).
+3. Start this FastAPI application (`uvicorn api:app ...`).
 
 **Important:** If the connection between the FastAPI service and an MCP server breaks *after* the application has started, this current setup **requires the FastAPI application to be restarted** to re-establish the connection during its startup phase.
 
@@ -134,20 +153,25 @@ API Docs available at `http://localhost:8000/docs`.
 * **Endpoint:** `/orchestrate`
 * **Method:** `POST`
 * **Request Body (JSON):** Describe the job application task.
+
     ```json
     {
       "task": "Find Machine Learning Engineer roles in California on LinkedIn and apply to the top 3 using my profile."
     }
     ```
+
 * **Success Response (200 OK):** Returns the final status or result from the orchestrator.
+
     ```json
     {
       "result": "Applied to 3 roles: [Role 1], [Role 2], [Role 3]. View status in dashboard.",
       "trace_id": "trace_..."
     }
     ```
+
     *(Note: Actual result depends heavily on the capabilities of the configured agents).*
 * **Example (`curl`):**
+
     ```bash
     curl -X 'POST' \
     'http://0.0.0.0:8000/orchestrate' \
@@ -178,11 +202,11 @@ API Docs available at `http://localhost:8000/docs`.
 
 The system is designed for easy extension:
 
-1.  **Define Agent in YAML:** Add a new entry to the `agents` list in `agents_config.yaml`.
+1. **Define Agent in YAML:** Add a new entry to the `agents` list in `agents_config.yaml`.
     * Provide `name`, `parameters` (`instructions`, `model_settings`, `handoff_description`).
     * If it needs browser/device control (MCP), define the required server in `mcp_servers` (if new) and reference its key using `mcp_server_key`.
     * *Examples*: Add a `ResumeParserAgent` (no MCP) or a `LinkedInInteractionAgent` (needs `playwright_mcp`).
-2.  **Restart Service:** Restart the FastAPI service (`uvicorn`). Ensure any *new* required MCP servers are started first.
+2. **Restart Service:** Restart the FastAPI service (`uvicorn`). Ensure any *new* required MCP servers are started first.
 
 *(This assumes the new agent fits the standard `Agent` initialization model handled by the generic creator in `api.py`. For agents requiring custom Python logic or state, specific factory functions or Agent subclasses might be needed, requiring adjustments to the loading logic.)*
 
@@ -193,4 +217,3 @@ The system is designed for easy extension:
 * **API Expansion:** Add endpoints for managing user profiles, viewing application status, finer-grained task control.
 * **Frontend Integration:** Connect backend to the dedicated frontend repository.
 * **Robustness & Scalability:** Enhance error handling, recovery, state management for long workflows, and optimize for higher throughput.
-
