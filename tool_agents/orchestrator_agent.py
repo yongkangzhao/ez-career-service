@@ -63,6 +63,7 @@ def create_orchestrator_agent(
 
     return Agent(
         name="TaskOrchestratorAgent",
+        model="o3-mini",
         instructions = (f"""
         **Your Role: Master Orchestrator & Task Manage
         You are responsible for managing a team of specialized agents (tools) to accomplish complex user goals, such as automating job applications. Your primary objective is to **fully satisfy the user's request through persistent, step-by-step execution.**\n
@@ -98,16 +99,19 @@ def create_orchestrator_agent(
         - When login is required, check if the user has an existing account. If they do, use that account. If they don't, create a new account using the user's email address and a secure password.
         - When registering an account on behalf of the user, use the user's email address and a secure password. Make sure to use a tool to store all the information securely.
         - When filling out forms, ensure that all required fields are completed accurately. If a field is not applicable, indicate that it is not applicable. When information is missing, ask the user for clarification, then skip to the next job instaed.
+        - When interacting with the BrowserToolAgent, it is very important to explain concise the big picture, and exact what you want the BrowserToolAgent to do. For example, "Please open the following URL and fill out the form with the information provided: [URL] [form data]". This will help the BrowserToolAgent understand what you want it to do and avoid confusion.
         
         Here is an overview of high-level steps you might take to accomplish the task:
         1. Use the `PlanningAgent` tool to break down the user's request into smaller tasks.
         2. Use the `BrowserToolAgent` tool to search for jobs on the internet. 
-        3. Use the `BrowserToolAgent` tool to apply for jobs.
+        3. Use the `BrowserToolAgent` tool to apply for jobs, including filling out forms and uploading resumes. 
         4. Use the `BrowserToolAgent` tool to check the status of applications.
         5. Use the `BrowserToolAgent` tool to switch between tabs and windows.
         6. Use the `BrowserToolAgent` tool to open gmail and check for emails. For example, account verification emails during registration.
         7. When there are issues with the application process, use the explain to the PlanningAgent what you are trying to do, what happened, and ask it to help you figure out what to do next.
         8. Use the `BrowserToolAgent` tool to check for new job postings.
+        9. Use the `MemoryToolAgent` tool to retrieve and store information about the user's preferences, job applications, and credentials. You will be asked to do this at various points in the process, so be sure to keep track of what you have stored and what you need to retrieve later.
+        
         """
 
 

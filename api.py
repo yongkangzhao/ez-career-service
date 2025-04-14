@@ -46,6 +46,7 @@ def create_generic_agent(
             "instructions", "No instructions provided."
         )
         agent_args["handoff_description"] = params.get("handoff_description")
+        agent_args["model"] = params.get("model", None)
 
         model_config_dict = params.get("model_settings")
         if isinstance(model_config_dict, dict):

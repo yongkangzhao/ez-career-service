@@ -25,6 +25,7 @@ mcp_servers:
 # --- Define Agents ---
 agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
+    model: gpt-4o-mini
     mcp_server_key: playwright_mcp
     # Renamed field for tool description override:
     description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
@@ -33,6 +34,9 @@ agents:
         You are an expert browser controller. Precisely execute browser tasks
         using the provided tools (like navigate, screenshot, click, input text).
         Focus only on executing the requested browser action.
+        When done, tell the user what happened, and provide all relevant information. So the user can make follow up requests.
+        Note the user does not have direct access to the browser, so the user must rely on you to perform the actions, and provide the results in a clear and concise manner.
+        You can also ask the user for clarifications if needed.
       model_settings:
         tool_choice: required
       # Optional: Can still exist as a fallback if 'description' above is missing
@@ -40,6 +44,7 @@ agents:
 
 
   - name: ProfileSpecialistAgent # This name WILL be used as the tool_name
+    model: gpt-4o-mini
     # Renamed field for tool description override:
     description: "Use this Agent to write special curated contents for LinkedIn profiles, or anything writing related."
     parameters:
@@ -53,6 +58,7 @@ agents:
       handoff_description: "Bearerer of the special content writing process."
 
   - name: MemoryAgent # This name WILL be used as the tool_name
+    model: gpt-4o-mini
     # Renamed field for tool description override:
     description: "Use this Agent to remember and recall information."
     mcp_server_key: memory_mcp
@@ -67,6 +73,7 @@ agents:
       handoff_description: "Remembers and recalls information."
 
   - name: PlanningAgent # This name WILL be used as the tool_name
+    model: gpt-4o-mini
     # Renamed field for tool description override:
     description: "Use this Agent to break down a complex goal into smaller steps understandable by other tools."
     parameters:
