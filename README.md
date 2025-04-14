@@ -56,7 +56,7 @@ While currently establishing the core multi-agent framework, orchestration logic
     ```
 3.  **Install Python Dependencies (using `uv`):**
     ```bash
-    uv sync
+    uv pip install .
     ```
     *(Ensure `PyYAML>=6.0` is listed in `pyproject.toml` dependencies).*
 
