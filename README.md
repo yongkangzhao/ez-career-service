@@ -68,27 +68,42 @@ This file defines the infrastructure and agents.
 
 ### 4. Running Required MCP Servers (Example: Playwright for Web Interaction)
 
-You **must** start required MCP servers *before* starting the FastAPI app.
+If your `agents_config.yaml` defines agents requiring MCP servers (like `playwright_mcp`), you **must** start these servers *before* starting the FastAPI application.
 
 **A. Start Chrome in Remote Debugging (CDP) Mode:**
-    * **Close all Chrome instances.**
-    * Run the command for your OS (adjust path if needed):
-        * macOS: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222`
-        * Linux: `google-chrome --remote-debugging-port=9222`
-        * Windows: `"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222`
-    * **Copy the `ws://127.0.0.1:9222/devtools/browser/SOME-UNIQUE-ID` URL** from the terminal output.
+
+* **IMPORTANT:** Ensure all other instances of Google Chrome are **completely closed** before running this command.
+    * Open your terminal and run the command appropriate for your Operating System. You might need to adjust the path to your Chrome executable:
+
+        * **On macOS:**
+            ```bash
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
+            ```
+        * **On Linux:** (Path may vary)
+            ```bash
+            google-chrome --remote-debugging-port=9222
+            # or chromium-browser --remote-debugging-port=9222
+            ```
+        * **On Windows:** (Path may vary)
+            ```bash
+            "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+            # Or "C:\Program Files (x86)\..."
+            ```
+    * This will launch Chrome. Look in the **terminal output** where you ran the command. You should see a line like:
+        `DevTools listening on ws://127.0.0.1:9222/devtools/browser/SOME-UNIQUE-ID`
+    * **Copy this entire `ws://...` URL.** You will need it for the next step. The `SOME-UNIQUE-ID` part changes every time.
 
 **B. Start the Playwright MCP Server:**
-    * Open a **new terminal**.
-    * Run:
+
+* Open **a new terminal window** (leave the one running Chrome CDP open).
+    * Run the following `npx` command, replacing `<PASTE_YOUR_CDP_ENDPOINT_URL_HERE>` with the full `ws://...` URL you copied from the Chrome terminal output:
         ```bash
         npx @playwright/mcp@latest --port 8931 --cdp-endpoint <PASTE_YOUR_CDP_ENDPOINT_URL_HERE>
         ```
-    * Ensure `--port 8931` matches the `url` in `agents_config.yaml` for `playwright_mcp`.
-    * Leave this terminal running.
+    * Ensure `--port 8931` specifies the port the MCP server will listen on. This **must match** the port in the `url` specified for `playwright_mcp` in your `agents_config.yaml`.
+    * Leave this terminal running. It is now acting as the bridge between the agent framework and the browser.
 
-*(Repeat similar steps for any other MCP servers defined in your config).*
-
+*(Repeat similar steps for any other MCP servers defined in your config, following their specific startup instructions).*
 ## Running the Service
 
 1.  **Prerequisites:** Ensure Python venv is active, dependencies installed, and required MCP servers are running.
