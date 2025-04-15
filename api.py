@@ -82,20 +82,20 @@ def create_generic_agent(
 
 
 def load_and_create_agents_from_defs(
-    agent_definitions: List[Dict[str, Any]], manager: Optional[MCPServerManager]
+    tool_: List[Dict[str, Any]], manager: Optional[MCPServerManager]
 ) -> List[Tuple[Agent, Dict[str, Any]]]:
     """
     Uses the generic creator function to instantiate agents and extracts
     the 'description' field from YAML for orchestrator tool metadata.
     """
     created_agents_with_meta: List[Tuple[Agent, Dict[str, Any]]] = []
-    if not agent_definitions:
+    if not tool_:
         return created_agents_with_meta
 
     print(
-        f"INFO: Processing {len(agent_definitions)} agent definitions using generic creator..."
+        f"INFO: Processing {len(tool_)} agent definitions using generic creator..."
     )
-    for agent_def in agent_definitions:
+    for agent_def in tool_:
         if not isinstance(agent_def, dict):
             continue  # Skip invalid
 
@@ -135,9 +135,9 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(f"Failed to load configuration: {e}") from e
 
     mcp_server_configs = app_config.get("mcp_servers", {})
-    agent_definitions = app_config.get("agents", [])
+    tool_agent_definitions = app_config.get("tool_agents", [])
     print(
-        f"INFO: Found {len(mcp_server_configs)} MCP server definitions and {len(agent_definitions)} agent definitions."
+        f"INFO: Found {len(mcp_server_configs)} MCP server definitions and {len(tool_agent_definitions)} agent definitions."
     )
 
     mcp_manager = MCPServerManager(mcp_server_configs)
@@ -148,10 +148,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         raise RuntimeError(f"MCP Connection failed: {e}") from e
 
-    print("INFO: Loading and creating tool agents...")
+    print("INFO: Loading and creating tool agents...")    
     try:
         tool_agents_with_meta = load_and_create_agents_from_defs(
-            agent_definitions=agent_definitions, manager=app_state["mcp_manager"]
+            tool_=tool_agent_definitions, manager=app_state["mcp_manager"]
         )
         app_state["tool_agents_with_meta"] = tool_agents_with_meta
     except Exception as e:
@@ -161,8 +161,17 @@ async def lifespan(app: FastAPI):
     if app_state["tool_agents_with_meta"]:
         tool_agent_count = len(app_state["tool_agents_with_meta"])
         print(f"INFO: Creating orchestrator agent with {tool_agent_count} tool(s).")
+        orchestrator_agent_config = app_config.get("orchestrator_agent", [])
+        if orchestrator_agent_config:
+            print(
+                f"INFO: Found orchestrator agent config."
+            )
+        else:
+            print(
+                f"WARNING: No orchestrator agent config found. Using default."
+            )
         try:
-            orchestrator = create_orchestrator_agent(app_state["tool_agents_with_meta"])
+            orchestrator = create_orchestrator_agent(orchestrator_agent_config, app_state["tool_agents_with_meta"])
             app_state["orchestrator_agent"] = orchestrator
             print("INFO: Orchestrator agent created successfully.")
         except Exception as e:

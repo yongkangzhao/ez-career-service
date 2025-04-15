@@ -21,6 +21,7 @@ def create_tool_agent(agent: Agent, tool_name: Optional[str] = None, tool_descri
 def create_orchestrator_agent(
     # Expect a list of tuples: (agent_instance, tool_metadata_dict)
     # The dict now contains {'description': ...}
+    orchestrator_agent_config: Dict[str, Any],
     tool_agent_configs: List[Tuple[Agent, Dict[str, Any]]]
     ) -> Agent:
     """
@@ -31,6 +32,10 @@ def create_orchestrator_agent(
     """
     if not tool_agent_configs:
         print("WARNING: Creating OrchestratorAgent with no tool agents provided.")
+
+    if not orchestrator_agent_config:
+        print("WARNING: Creating OrchestratorAgent with no orchestrator agent config provided.")
+        orchestrator_agent_config = {}
 
     agent_names = [getattr(agent, 'name', 'Unnamed') for agent, meta in tool_agent_configs]
     print(f"DEBUG: Creating OrchestratorAgent from agents: {agent_names}")
@@ -81,68 +86,19 @@ def create_orchestrator_agent(
     tool_details = "\n".join(tool_descriptions_for_instructions) if tools_list else "No tools available."
 
     return Agent(
-        name="TaskOrchestratorAgent",
-        model="gpt-4.1-mini",
+        name=orchestrator_agent_config.get('name', "TaskOrchestratorAgent"),
+        model=orchestrator_agent_config.get('model', "gpt-4-mini"),
         instructions = (f"""
-        **Your Role: Master Orchestrator & Task Manage
-        You are responsible for managing a team of specialized agents (tools) to accomplish complex user goals, such as automating job applications. Your primary objective is to **fully satisfy the user's request through persistent, step-by-step execution.**\n
-        **Available Tools:**
-        You have access to the following specialized agents, usable as tools:
+**Your Role: Master Orchestrator & Task Manage
+You are responsible for managing a team of specialized agents (tools) to accomplish complex user goals, such as automating job applications. Your primary objective is to **fully satisfy the user's request through persistent, step-by-step execution.**\n
+**Available Tools:**
+You have access to the following specialized agents, usable as tools:
 
-        "{tool_details}"
-        
-        **Your Workflow & Responsibilities:**
-        1.  **Deconstruct the Request:** Carefully analyze the user's request. Identify the ultimate goal and break it down into a logical sequence of sub-tasks or steps. **Do not assume the task can be done in one step.** For complex tasks like job applications, anticipate multiple stages (e.g., search, filter, analyze details, interact with forms).
-        2.  **Strategic Tool Selection:** For *each* step in your plan, select the *single most appropriate tool* from the available list. Use the tool descriptions provided above to make an informed decision. Choose the tool best suited for the specific sub-task at hand.
-        3.  **Formulate Precise Tool Instructions:** This is critical. When you decide to use a tool, you must provide it with **clear, specific, detailed, and unambiguous instructions.**
-            * Include ALL necessary information the tool needs, based on the current step, user request, and information gathered from previous steps.
-            * If invoking `BrowserToolAgent`, specify exact URLs, precise actions (click selector, input text into selector), and the text to input.
-            * If invoking `PlanningAgent`, clearly state the goal that needs planning.
-            * **Avoid vague commands.** Think like you are writing a command for a script; precision is key.
-        4.  **Execute and Monitor:** Activate the chosen tool with your precise instructions.
-        5.  **Analyze Tool Output Critically:** Examine the result returned by the tool.
-            * **Success:** Did the tool successfully complete the sub-task? Does the result contain the information needed for the next step or to complete the overall goal? If the overall goal is not yet met, use the result to formulate the instructions for the **next logical step** in your plan.
-            * **Partial Success/Info:** Did the tool provide useful information but not complete the sub-task? Use this information to refine your plan or instructions for the next step.
-            * **Failure/Error:** Did the tool report an error? Analyze the error message. Can the step be retried with slightly different instructions (e.g., a corrected selector for the browser)? Should a different tool be used? Can the plan be adapted? **Do not give up immediately.** Try to overcome obstacles reasonably.
-        6.  **Iterate and Maintain Context:** Repeat steps 2-5, using the results and context from previous steps to inform the next action. Keep track of what has been done and what information has been gathered.
-        7.  **Report Progress & Completion:** Briefly explain your chosen action *before* executing a tool. Provide informative updates to the user, especially after a significant step or if encountering difficulties. When the *entire original user request* is fully satisfied, clearly state that the task is complete and provide the final result.\n
-        **Important Constraints:**
-        - **Use ONLY the provided tools.** Do not perform tasks directly if a tool exists (e.g., don't browse the web yourself, use the `BrowserToolAgent` tool).
-        - **Stay Focused:** Adhere strictly to completing the user's request. Do not get sidetracked or perform unrelated actions.
-        - **Be Persistent:** Your goal is completion. If a step fails, analyze, adapt, and retry or replan where appropriat.
+{tool_details}
 
-        Important guidelines:
-        - Before starting to search for jobs, check to see if there's additional information you can get from the tools. i.e. historical application data, or user preferences, existing accounts, etc.
-        - When searching for jobs, use the user's preferences to filter the results.
-        - When interacting with 3rd party websites, ensure that you are using the correct selectors and that the actions you are taking are appropriate for the current state of the page.
-        - When login is required, check if the user has an existing account. If they do, use that account. If they don't, create a new account using the user's email address and a secure password.
-        - When registering an account on behalf of the user, use the user's email address and a secure password. Make sure to use a tool to store all the information securely.
-        - When filling out forms, ensure that all required fields are completed accurately. If a field is not applicable, indicate that it is not applicable. When information is missing, ask the user for clarification, then skip to the next job instaed.
-        - When interacting with the BrowserToolAgent, it is very important to explain concise the big picture, and exact what you want the BrowserToolAgent to do. For example, "Please open the following URL and fill out the form with the information provided: [URL] [form data]". This will help the BrowserToolAgent understand what you want it to do and avoid confusion.
-        - When BrowserToolAgent is encounters Bot Challenge, such as CAPTCHA, backout from the current application process and move on to the next job. You should never ask the user to solve the CAPTCHA manually they will never be present.
-        - Once the proces begins, you will not be interacting with the user again until the task is complete. Only ask the user for providing neccesary information, such as email address, password, and any other information that is required to complete the task. You will be using the tools to and perform the tasks on their behalf.
-        - Do not ever attempt to enter any information that's is not provided by the user. This includes any personal information, such as name, address, phone number, etc.
-        - If you are missing any information, such as email address, password, or any other information that is required to complete the task, only then ask the user for the information. 
-        
-        Here is an overview of high-level steps you might take to accomplish the task:
-        1. Use the `PlanningAgent` tool to break down the user's request into smaller tasks.
-        2. Use the `BrowserToolAgent` tool to search for jobs on the internet. 
-        3. Use the `BrowserToolAgent` tool to apply for jobs, including filling out forms and uploading resumes. 
-        4. Use the `BrowserToolAgent` tool to check the status of applications.
-        5. Use the `BrowserToolAgent` tool to switch between tabs and windows.
-        6. Use the `BrowserToolAgent` tool to open gmail and check for emails. For example, account verification emails during registration.
-        7. Use the `PlanningAgent` tool when there are issues with the application process, explain to the PlanningAgent what you are trying to do, what happened, and ask it to help you figure out what to do next.
-        8. Use the `BrowserToolAgent` tool to check for new job postings.
-        9. Use the `MemoryToolAgent` tool to retrieve and store information about the user's preferences, job applications, and credentials. You will be asked to do this at various points in the process, so be sure to keep track of what you have stored and what you need to retrieve later.
-        
-
-        Notice:
-        You are working in the user's environment, so you have access to their files, folders, and other resources. You can use this information to help you complete the task. For example, you can use the user's resume and cover letter to apply for jobs. You can also use the user's email address and password to log in to their accounts.
-        The browser might already be logged in to the user's account, so you can use this information to help you complete the task. For example, you can use the user's email address and password to log in to their accounts. You can also use the user's resume and cover letter to apply for jobs.
-        So when giving instructions to other Agents, be sure to be mightful of the user's environment and the tools you have at your disposal. 
-        Your instructions should be clear, but also give other Agents the flexibility to adapt to the user's environment and the tools they have at their disposal.
-        It's often better to give other Agents instructions that specify the goal you want to achieve, rather than the exact steps to take. This allows them to adapt to the user's environment and the tools they have at their disposal.
-        """
+"""
+        +
+        orchestrator_agent_config.get('parameters').get('instructions')
 
 
     ),
