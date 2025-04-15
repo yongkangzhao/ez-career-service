@@ -1,8 +1,22 @@
 # tool_agents/orchestrator_agent.py
-from agents import Agent
+from agents import Agent, function_tool, Runner, ItemHelpers
 from typing import List, Dict, Any, Tuple, Optional
 
 # --- REMOVED TOOL_METADATA_OVERRIDES ---
+
+def create_tool_agent(agent: Agent, tool_name: Optional[str] = None, tool_description: Optional[str] = None, max_turn: Optional[int] = 100) -> Agent:
+    async def run_agent(query: str) -> str:
+        result = await Runner.run(
+            agent,
+            query,
+            max_turns=max_turn,
+        )
+        return ItemHelpers.text_message_outputs(result.new_items)
+    return function_tool(run_agent,
+        name_override=tool_name or agent.name,
+        description_override=tool_description
+    )
+
 
 def create_orchestrator_agent(
     # Expect a list of tuples: (agent_instance, tool_metadata_dict)
@@ -46,9 +60,14 @@ def create_orchestrator_agent(
 
         print(f"DEBUG: Converting agent '{agent_name}' to tool '{tool_name_to_use}' with description: '{tool_description_to_use}'")
         try:
-            agent_tool = agent.as_tool(
-                tool_name=tool_name_to_use, # Use agent's actual name
-                tool_description=tool_description_to_use, # Use determined description
+            # agent_tool = agent.as_tool(
+            #     tool_name=tool_name_to_use, # Use agent's actual name
+            #     tool_description=tool_description_to_use, # Use determined description
+            # )
+            agent_tool = create_tool_agent(
+                agent,
+                tool_name=tool_name_to_use,
+                tool_description=tool_description_to_use
             )
             tools_list.append(agent_tool)
             tool_descriptions_for_instructions.append(f"- {tool_name_to_use}: {tool_description_to_use}")
@@ -100,6 +119,7 @@ def create_orchestrator_agent(
         - When registering an account on behalf of the user, use the user's email address and a secure password. Make sure to use a tool to store all the information securely.
         - When filling out forms, ensure that all required fields are completed accurately. If a field is not applicable, indicate that it is not applicable. When information is missing, ask the user for clarification, then skip to the next job instaed.
         - When interacting with the BrowserToolAgent, it is very important to explain concise the big picture, and exact what you want the BrowserToolAgent to do. For example, "Please open the following URL and fill out the form with the information provided: [URL] [form data]". This will help the BrowserToolAgent understand what you want it to do and avoid confusion.
+        - When BrowserToolAgent is encounters Bot Challenge, such as CAPTCHA, backout from the current application process and move on to the next job. You should never ask the user to solve the CAPTCHA manually they will never be present.
         
         Here is an overview of high-level steps you might take to accomplish the task:
         1. Use the `PlanningAgent` tool to break down the user's request into smaller tasks.

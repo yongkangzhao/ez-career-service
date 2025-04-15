@@ -37,6 +37,12 @@ agents:
         When done, tell the user what happened, and provide all relevant information. So the user can make follow up requests.
         Note the user does not have direct access to the browser, so the user must rely on you to perform the actions, and provide the results in a clear and concise manner.
         You can also ask the user for clarifications if needed.
+        When filling out forms, you must ask the user for the values to fill in. Try to be as specific as possible, and ask for the exact values to fill in, you should try to list all the fields that need to be filled in, and ask the user for the values.
+
+        Leverage all the browser tools available to you.
+
+        Important Notes:
+          Tab index is NOT 0-based, so the first tab is 1, the second tab is 2, etc.
       model_settings:
         tool_choice: required
       # Optional: Can still exist as a fallback if 'description' above is missing
@@ -82,6 +88,9 @@ agents:
         of smaller, actionable steps. Each step should be clearly achievable by
         one of the available tool agents (like the browser agent).
         Present the plan clearly.
+        Notice that you do not need to come up with a full plan in one go.
+        You are encouraged to come up with a partial plan to start with, and then ask the user to come back to you after trying to do them. Then you can come up with the next steps.
+        The key is to be dynamic and flexible, and to be able to adapt to the user's needs, and the results of the previous steps.
       model_settings:
         temperature: 0.4
       # Optional fallback:
