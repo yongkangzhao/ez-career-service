@@ -25,7 +25,7 @@ mcp_servers:
 # --- Define Agents ---
 agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
-    model: gpt-4o-mini
+    model: gpt-4.1-mini
     mcp_server_key: playwright_mcp
     # Renamed field for tool description override:
     description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
@@ -41,8 +41,14 @@ agents:
 
         Leverage all the browser tools available to you.
 
+
+
         Important Notes:
           Tab index is NOT 0-based, so the first tab is 1, the second tab is 2, etc.
+          When searching on LinkedIn remember to hit Enter to trigger the search. There's no button to click.
+          After each action, you should wait for the page to load, and then check if the action was successful.
+          Some webpages may require you to wait for a specific element to load before proceeding.
+          Some webpage elements are very volitile, and may require you to retry many times before succeeding, be patient, and keep trying.
       model_settings:
         tool_choice: required
       # Optional: Can still exist as a fallback if 'description' above is missing
@@ -50,7 +56,7 @@ agents:
 
 
   - name: ProfileSpecialistAgent # This name WILL be used as the tool_name
-    model: gpt-4o-mini
+    model: gpt-4.1-nano
     # Renamed field for tool description override:
     description: "Use this Agent to write special curated contents for LinkedIn profiles, or anything writing related."
     parameters:
@@ -64,7 +70,7 @@ agents:
       handoff_description: "Bearerer of the special content writing process."
 
   - name: MemoryAgent # This name WILL be used as the tool_name
-    model: gpt-4o-mini
+    model: gpt-4.1-nano
     # Renamed field for tool description override:
     description: "Use this Agent to remember and recall information."
     mcp_server_key: memory_mcp
@@ -79,7 +85,7 @@ agents:
       handoff_description: "Remembers and recalls information."
 
   - name: PlanningAgent # This name WILL be used as the tool_name
-    model: gpt-4o-mini
+    model: gpt-4.1-nano
     # Renamed field for tool description override:
     description: "Use this Agent to break down a complex goal into smaller steps understandable by other tools."
     parameters:
