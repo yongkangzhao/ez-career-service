@@ -6,7 +6,12 @@ Milpitas, CA | (408) 506-8832 | cookieyong@gmail.com | [linkedin.com/in/aiden-zh
 
 ## WORK EXPERIENCES
 
-**SENIOR MACHINE LEARNING ENGINEER** | TIFIN | Remote, CA | May 2024 - Present
+**SENIOR DATA SCIENTIST** | Capital One | United States | Sep 2024 - Present
+* Improving Multi Agent Framework MACAW to enable other LOBs to quickly and effectively deliver agentic solutions.
+* Currently working on large scale LLM pre training data curation pipeline.
+
+**SENIOR MACHINE LEARNING ENGINEER** | TIFIN | Remote | May 2024 - Sep 2024
+* Design and rapidly build a multi-agent system for financial advisors to be more effective in portfolio management for all their clients.
 * Enhanced conversational capabilities of AI Agent, significantly improving user interaction experience.
 * Fine-tuned open-source models, boosting performance, task-specific accuracy, dramatically reducing latency.
 * Designed and implemented tools for AI agents, expanding their functionality and efficiency.
