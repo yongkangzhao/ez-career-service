@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import yaml
 from agents import Agent, ItemHelpers, MessageOutputItem, ModelSettings, Runner, trace
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from mcp_server_manager import MCPServerManager
@@ -39,10 +40,9 @@ def create_generic_agent(
     agent_name = agent_config.get("name", "UnnamedAgent")
     params = agent_config.get("parameters", {})
     mcp_key = agent_config.get("mcp_server_key")
+    print(f"INFO: Creating generic agent: {agent_name} (MCP Key: {mcp_key or 'None'})")
     final_agent_name = params.get("name", agent_name)
-    print(
-        f"INFO: Attempting to create generic agent: {final_agent_name} (Config Name: {agent_name}, MCP Key: {mcp_key or 'None'})"
-    )
+    
     try:
         agent_args: Dict[str, Any] = {}
         agent_args["name"] = final_agent_name
@@ -63,11 +63,24 @@ def create_generic_agent(
         if mcp_key:
             if mcp_manager is None:
                 return None
-            try:
-                server_instance = mcp_manager.get_server(mcp_key)
-                agent_args["mcp_servers"] = [server_instance]
-            except KeyError:
+            
+            # Parse mcp_key as potentially space-separated values
+            mcp_keys = mcp_key.split() if isinstance(mcp_key, str) else [mcp_key]
+            mcp_servers = []
+            
+            for key in mcp_keys:
+                try:
+                    server_instance = mcp_manager.get_server(key)
+                    mcp_servers.append(server_instance)
+                except KeyError:
+                    print(f"WARNING: MCP server with key '{key}' not found")
+            
+            if not mcp_servers:
+                print(f"ERROR: None of the specified MCP servers were found: {mcp_key}")
                 return None
+                
+            agent_args["mcp_servers"] = mcp_servers
+            
         agent_instance = Agent(**agent_args)
         print(f"INFO: Successfully created generic agent: {final_agent_name}")
         return agent_instance
@@ -195,6 +208,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="EZ-Career Backend Service", lifespan=lifespan)
+
+# Add CORS middleware to allow requests from the frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def get_mcp_manager() -> MCPServerManager:
