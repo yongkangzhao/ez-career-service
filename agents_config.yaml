@@ -39,7 +39,9 @@ mcp_servers:
 tool_agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
     model: gpt-4.1-mini
-    mcp_server_key: browser_use_mcp
+    mcp_server_key: 
+      browser_use_mcp
+      user_profile_mcp
     # Renamed field for tool description override:
     description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
     parameters:
@@ -50,9 +52,10 @@ tool_agents:
         When done, tell the user what happened, and provide all relevant information. So the user can make follow up requests.
         Note the user does not have direct access to the browser, so the user must rely on you to perform the actions, and provide the results in a clear and concise manner.
         You can also ask the user for clarifications if needed.
-        When filling out forms, you must ask the user for the values to fill in. Try to be as specific as possible, and ask for the exact values to fill in, you should try to list all the fields that need to be filled in, and ask the user for the values.
 
-        Leverage all the browser tools available to you.
+        When filling out the user's information, you must fetch and use the user's profile from the MCP tools. You have access to the first name, last name, email, phone number, and resume. Only use the exact information retrieved from the MCP tools for these fields. Do not enter any made-up or placeholder values.
+        
+        Leverage all the browser tools and profile tools available to you.
 
         Important Notes:
           Tab index is NOT 0-based, so the first tab is 1, the second tab is 2, etc.
