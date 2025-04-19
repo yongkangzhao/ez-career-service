@@ -4,15 +4,15 @@
 # --- Define MCP Servers ---
 # Dictionary where keys are unique identifiers used by agents in 'mcp_server_key'.
 mcp_servers:
-  # playwright_mcp: # Unique key for the Playwright server
-  #   type: sse # sse / stdio
-  #   params:
-  #     # REQUIRED: URL for the server
-  #     url: http://localhost:8931/sse
-  #     # Optional: Name used in logs/tracing for this specific server instance
-  #     name: Playwright MCP Server
-  #     # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
-  #     # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
+  playwright_mcp: # Unique key for the Playwright server
+    type: sse # sse / stdio
+    params:
+      # REQUIRED: URL for the server
+      url: http://localhost:8931/sse
+      # Optional: Name used in logs/tracing for this specific server instance
+      name: Playwright MCP Server
+      # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
+      # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
 
   browser_use_mcp:
     type: stdio
@@ -39,8 +39,7 @@ mcp_servers:
 tool_agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
     model: gpt-4.1-mini
-    mcp_server_key: 
-      browser_use_mcp
+    mcp_server_key: browser_use_mcp
       user_profile_mcp
     # Renamed field for tool description override:
     description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
@@ -54,7 +53,7 @@ tool_agents:
         You can also ask the user for clarifications if needed.
 
         When filling out the user's information, you must fetch and use the user's profile from the MCP tools. You have access to the first name, last name, email, phone number, and resume. Only use the exact information retrieved from the MCP tools for these fields. Do not enter any made-up or placeholder values.
-        
+
         Leverage all the browser tools and profile tools available to you.
 
         Important Notes:
@@ -72,14 +71,12 @@ tool_agents:
       # Optional: Can still exist as a fallback if 'description' above is missing
       handoff_description: Controls a web browser (navigation, screenshots, interaction).
 
-
   - name: UserAgent # This name WILL be used as the tool_name
     model: gpt-4.1-nano
     # Renamed field for tool description override:
     description: This agent has permission to act on behalf of the user.
     mcp_server_key: user_profile_mcp
     parameters:
-
       instructions: >
         You are a Profile Specialist. Your primary task is to act on behalf of the Job Seeker.
         You have full permission to act on behalf of the user, and will be asked to do so at various points in the process.
@@ -108,8 +105,7 @@ tool_agents:
     model: gpt-4.1-nano
     # Renamed field for tool description override:
     description: Use this Agent to remember and recall information.
-    mcp_server_key: 
-      memory_mcp
+    mcp_server_key: memory_mcp
       user_profile_mcp
     parameters:
       instructions: >
@@ -181,7 +177,7 @@ orchestrator_agent:
       - You will be using the tools to and perform the tasks on their behalf. 
       - Do not ever attempt to enter any information that's is not provided by agents. This includes any personal information, such as name, address, phone number, etc.
       - If you are missing any information, such as email address, password, or any other information that is required to complete the task, only then ask the user for the information. 
-      
+
       Here is an overview of high-level steps you might take to accomplish the task:
       1. Use the `PlanningAgent` tool to break down the user's request into smaller tasks.
       2. Use the `BrowserToolAgent` tool to search for jobs on the internet. 
