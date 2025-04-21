@@ -8,8 +8,10 @@ from typing import Optional, Any # Use specific types if known
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from browser_use import Agent, Browser, BrowserConfig
+from browser_use import Agent, Browser, BrowserConfig, Controller, ActionResult
+from browser_use.browser.context import BrowserContext
 from mcp.server.fastmcp import FastMCP
+
 
 mcp = FastMCP("browser_tool_service")
 
@@ -34,6 +36,35 @@ llm_instance: Optional[ChatOpenAI] = None
 CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" # Or get from env
 OPENAI_MODEL = "gpt-4o"
 
+controller = Controller()
+
+
+@controller.action('Upload cv to element - call this function to upload if element is not found, try with different index of the same upload element')
+async def upload_cv(index: int, browser: BrowserContext, cv_path: str) -> ActionResult:
+    path = str(cv_path.absolute())
+    dom_el = await browser.get_dom_element_by_index(index)
+
+    if dom_el is None:
+        return ActionResult(error=f'No element found at index {index}')
+
+    file_upload_dom_el = dom_el.get_file_upload_element()
+
+    if file_upload_dom_el is None:
+        return ActionResult(error=f'No file upload element found at index {index}')
+
+    file_upload_el = await browser.get_locate_element(file_upload_dom_el)
+
+    if file_upload_el is None:
+        return ActionResult(error=f'No file upload element found at index {index}')
+
+    try:
+        await file_upload_el.set_input_files(path)
+        msg = f'Successfully uploaded file "{path}" to index {index}'
+        return ActionResult(extracted_content=msg)
+    except Exception as e:
+        return ActionResult(error=f'Failed to upload file to index {index}')
+
+
 async def setup_mcp_and_browser():
     """Initializes MCP, LLM, Browser, and Browser Context."""
     global shared_browser, shared_context, llm_instance
@@ -50,6 +81,7 @@ async def setup_mcp_and_browser():
         browser_config = BrowserConfig(
             chrome_instance_path=CHROME_PATH,
             disable_security=True,
+            headless=True
         )
         shared_browser = Browser(config=browser_config)
         print("Initializing Browser Context...")
@@ -84,6 +116,7 @@ async def browser_use(task: str) -> Any:
             llm=llm_instance,
             browser_context=shared_context,
             browser=shared_browser,
+            controller=controller
         )
         print(f"Running agent for task: {task}...")
         result_data = await agent.run()
