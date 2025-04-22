@@ -35,12 +35,21 @@ mcp_servers:
       command: python
       args:
         - mcp_servers/user_profile_mcp.py
+
+  supabase_mcp:
+    type: stdio
+    params:
+      command: python
+      args:
+        - mcp_servers/supabase_mcp.py
+
 # --- Define Agents ---
 tool_agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
     model: gpt-4.1-mini
     mcp_server_key: browser_use_mcp
       user_profile_mcp
+      supabase_mcp
     # Renamed field for tool description override:
     description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
     parameters:
@@ -57,6 +66,8 @@ tool_agents:
 
         Leverage all the browser tools available to you.
         When filling out the user's information, you must fetch and use the user's profile from the MCP tools. You have access to the first name, last name, email, phone number, and resume. Only use the exact information retrieved from the MCP tools for these fields. Do not enter any made-up or placeholder values.
+
+        When you have successfully submitted a job application, use supabase_mcp to record the position title and company name in the database.
 
         Important Notes:
           When searching on LinkedIn remember to hit Enter to trigger the search. There's no button to click.
