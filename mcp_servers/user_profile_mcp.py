@@ -302,7 +302,8 @@ def get_resume_content(user_id: str) -> Dict[str, Any]:
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=messages,
-                    max_tokens=4000
+                    max_tokens=4000,
+                    temperature=0.0,
                 )
                 
                 resume_content = response.choices[0].message.content

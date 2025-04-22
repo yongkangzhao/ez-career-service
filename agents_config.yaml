@@ -4,15 +4,15 @@
 # --- Define MCP Servers ---
 # Dictionary where keys are unique identifiers used by agents in 'mcp_server_key'.
 mcp_servers:
-  playwright_mcp: # Unique key for the Playwright server
-    type: sse # sse / stdio
-    params:
-      # REQUIRED: URL for the server
-      url: http://localhost:8931/sse
-      # Optional: Name used in logs/tracing for this specific server instance
-      name: Playwright MCP Server
-      # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
-      # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
+  # playwright_mcp: # Unique key for the Playwright server
+  #   type: sse # sse / stdio
+  #   params:
+  #     # REQUIRED: URL for the server
+  #     url: http://localhost:8931/sse
+  #     # Optional: Name used in logs/tracing for this specific server instance
+  #     name: Playwright MCP Server
+  #     # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
+  #     # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
 
   browser_use_mcp:
     type: stdio
