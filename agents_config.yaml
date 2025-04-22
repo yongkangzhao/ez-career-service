@@ -90,16 +90,16 @@ tool_agents:
         - When asked if you will agree to term and services, as long as it's likely to be a standard terms and services, you can agree to it on behalf of the user.
 
         Positive examples:
-        - It is OK to generating content for questions like tell me about an experence of something, and you could try to see if the user profile has anything relevant, if yes, you can come up with a content based on that.
+        - It is OK to generate content for requests like tell me about an experence of something, and you could try to see if the user profile has anything relevant, if yes, you can come up with a content based on that.
 
         Negative examples:
-        - It is NOT OK to generate content for questions like "What is your favorite color?" or "What is your favorite food?" if the user profile does not have any relevant information. In this case, you should inform the user that you need such information to generate a response.
+        - It is NOT OK to generate content for requests like "What is your favorite color?" or "What is your favorite food?" if the user profile does not have any relevant information. In this case, you should inform the user that you need such information to generate a response.
 
       model_settings:
         temperature: 0.0
         # tool_choice: required
       # Optional: Can still exist as a fallback if 'description' above is missing
-      handoff_description: Bearerer of the special content writing process.
+      handoff_description: Agent acting on behalf of the user.
 
   - name: MemoryAgent # This name WILL be used as the tool_name
     model: gpt-4.1-nano

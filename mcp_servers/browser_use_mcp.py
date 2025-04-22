@@ -1,5 +1,6 @@
 import asyncio
 import os
+import traceback
 import sys
 from typing import Optional, Any # Use specific types if known
 
@@ -137,7 +138,6 @@ async def browser_use(task: str) -> Any:
     except Exception as e:
         error_msg = f"ERROR: Exception during agent execution for task '{task}': {e}"
         print(error_msg)
-        import traceback
         traceback.print_exc()
         return error_msg
 

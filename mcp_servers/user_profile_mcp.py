@@ -25,9 +25,24 @@ DEFAULT_PASSWORD = os.getenv("DEFAULT_PASSWORD", "password")
 # Global variable to store current user session
 current_user_session = None
 
+user_email = DEFAULT_EMAIL
+user_password = DEFAULT_PASSWORD
+
+# Authenticate with Supabase
+auth_response = supabase.auth.sign_in_with_password({
+    "email": user_email,
+    "password": user_password
+})
+
+user_id = auth_response.user.id
+user_email = auth_response.user.email
+
+# Store the session for future use
+current_user_session = auth_response.session
+
 mcp = FastMCP("user_profile")
 
-@mcp.tool()
+# @mcp.tool()
 def authenticate(email: Optional[str] = None, password: Optional[str] = None) -> Dict[str, Any]:
     """
     Authenticate with Supabase to enable retrieving the current user's profile.
@@ -97,7 +112,7 @@ def get_current_user_profile() -> Dict[str, Any]:
         }
 
 @mcp.tool()
-def get_resume(user_id: str) -> Dict[str, Any]:
+def get_resume() -> Dict[str, Any]:
     """
     Retrieve the user's resume URL from the Supabase profile table.
     
@@ -136,7 +151,7 @@ def get_resume(user_id: str) -> Dict[str, Any]:
         }
 
 @mcp.tool()
-def get_full_name(user_id: str) -> Dict[str, Any]:
+def get_full_name() -> Dict[str, Any]:
     """
     Retrieve the user's first and last name from the Supabase profile table.
     
@@ -180,7 +195,7 @@ def get_full_name(user_id: str) -> Dict[str, Any]:
         }
 
 @mcp.tool()
-def get_user_profile(user_id: str) -> Dict[str, Any]:
+def get_user_profile() -> Dict[str, Any]:
     """
     Retrieve the complete user profile from Supabase.
     
@@ -213,7 +228,7 @@ def get_user_profile(user_id: str) -> Dict[str, Any]:
         }
 
 @mcp.tool()
-def get_resume_content(user_id: str) -> Dict[str, Any]:
+def get_resume_content() -> Dict[str, Any]:
     """
     Fetch the user's resume, convert it to image, analyze with GPT-4o,
     and return a structured text representation of the resume content.
@@ -300,7 +315,7 @@ def get_resume_content(user_id: str) -> Dict[str, Any]:
                 
                 # Call GPT-4o to analyze the resume
                 response = client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4o-mini",
                     messages=messages,
                     max_tokens=4000,
                     temperature=0.0,
