@@ -43,13 +43,18 @@ mcp_servers:
       args:
         - mcp_servers/supabase_mcp.py
 
+  user_assistance_mcp:
+    type: stdio
+    params:
+      command: python
+      args:
+        - mcp_servers/user_assistance_mcp.py
+
 # --- Define Agents ---
 tool_agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
     model: o4-mini-2025-04-16
-    mcp_server_key: playwright_mcp
-      user_profile_mcp
-      supabase_mcp
+    mcp_server_key: "playwright_mcp user_profile_mcp supabase_mcp"
     # Renamed field for tool description override:
     description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
     parameters:
@@ -67,6 +72,16 @@ tool_agents:
         When resume file upload is needed use the browser_file_upload() tool to do so.
         When you have successfully submitted a job application, do not stop or leave immediately.
         You must use the insert_application tool to record the position_title and the company_name of the job you just successfully applied.
+
+        IMPORTANT: If you encounter issues during the application process (missing information,
+        CAPTCHA, etc.), DO NOT end the entire task. Instead:
+        1. Clearly report the specific issue encountered
+        2. Explain why you cannot proceed with this particular application
+        3. Indicate that you are ready to continue with another application
+
+        Your role is to continue applying to as many jobs as possible, even if some applications
+        fail. Always return control to the orchestrator after each application attempt, successful
+        or not.
 
         When uploading resume, during application process, ask the get_resume_path tool to provide you with the path to the resume file.
         Then provide the path to browser_use tool, and ask it to upload the resume file.
@@ -112,6 +127,53 @@ tool_agents:
       # Optional fallback:
       handoff_description: Creates step-by-step plans.
 
+  - name: UserAssistanceAgent
+    model: o4-mini-2025-04-16
+    mcp_server_key: user_assistance_mcp
+    description: "Logs issues that require user attention and continues with other applications"
+    parameters:
+      instructions: >
+        You help record issues encountered during the automated job application process.
+
+        When an issue is encountered that requires user input or attention:
+        1. Log the issue with detailed information
+        2. Send a notification to alert the user
+        3. Move on to other applications rather than waiting for resolution
+
+        Be thorough in documenting what information was missing or what problem occurred,
+        so the user can understand and resolve it later.
+
+        IMPORTANT: After logging an issue, you MUST return control to the orchestrator agent.
+        DO NOT terminate the overall process or mark the whole task as complete. Your role is 
+        simply to record the issue and let the orchestrator continue with other applications.
+
+        Your response after logging an issue should always include a clear statement that the
+        orchestrator should proceed to the next application, such as: "Issue logged successfully.
+        Please proceed to the next application in the queue."
+
+        PREFERRED METHODS TO USE:
+        - log_simple_issue: Use this method to log issues. It only requires company name, position,
+          issue type, and detailed description. The user ID and application ID are handled automatically.
+        - send_simple_notification: Use this to send notifications without needing the user ID.
+
+        These methods automatically handle user authentication and return appropriate messages
+        instructing the orchestrator to continue processing.
+
+        Do NOT use log_application_issue or send_application_notification unless you specifically
+        need to provide custom user_id and application_id values.
+
+        Common issue types to log:
+        - missing_information: Required field not available in user profile
+        - technical_barrier: CAPTCHA, authentication issues, site errors
+        - decision_required: Application question needs subjective input
+        - incompatible_requirements: Job requirements don't match user qualifications
+        - system_error: Internal agent or processing error
+
+        You are part of a non-blocking automated background job system, so your priority
+        is to log issues clearly and allow the agent to continue with other tasks.
+      model_settings:
+        tool_choice: required
+
 orchestrator_agent:
   name: OrchestratorAgent # This name WILL be used as the tool_name
   model: o4-mini-2025-04-16
@@ -135,6 +197,14 @@ orchestrator_agent:
       6.  **Iterate and Maintain Context:** Repeat steps 2-5, using the results and context from previous steps to inform the next action. Keep track of what has been done and what information has been gathered.
       7.  **Report Progress & Completion:** Briefly explain your chosen action *before* executing a tool. Provide informative updates to the user, especially after a significant step or if encountering difficulties.
 
+      **CRITICAL EXECUTION REQUIREMENT:** 
+      When you use the PlanningAgent, you MUST NOT consider the task completed after obtaining a plan. The plan is only the first step. You MUST EXECUTE the plan by using the appropriate tools (primarily BrowserToolAgent) to carry out each step of the plan sequentially. Creating a plan is never the final output - you must continue with implementation by:
+      1. Using BrowserToolAgent to navigate to websites, fill forms, and submit applications
+      2. Using UserProfileAgent to retrieve user information needed for applications
+      3. Using UserAssistanceAgent to log issues when encountered
+
+      Only after performing concrete actions through these tools should the task be considered complete. DO NOT stop after planning.
+
       **Important Constraints:**
       - **Use ONLY the provided tools.** Do not perform tasks directly if a tool exists (e.g., don't browse the web yourself, use the `BrowserToolAgent` tool).
       - **Stay Focused:** Adhere strictly to completing the user's request. Do not get sidetracked or perform unrelated actions.
@@ -145,6 +215,35 @@ orchestrator_agent:
       - When interacting with 3rd party websites, ensure that you are using the correct selectors and that the actions you are taking are appropriate for the current state of the page.
       - When interacting with the BrowserToolAgent, it is very important to explain concise the big picture, and exact what you want the BrowserToolAgent to do. For example, "Please open the following URL and fill out the form with the information provided: [URL] [form data]". This will help the BrowserToolAgent understand what you want it to do and avoid confusion.
       - When BrowserToolAgent is encounters Bot Challenge, such as CAPTCHA, or encounters a form where you don't have the necessary information from the user, back out from the current application process and move on to the next job. You should never wait for an action from the user, as they will never be present. 
+
+      When you encounter issues during the job application process, such as:
+      - Missing required information not available in the user profile
+      - CAPTCHA or other verification challenges
+      - Login issues or other technical barriers
+      - Custom application questions without clear answers
+
+      Use the following protocol:
+      1. Use the UserAssistanceAgent to log the issue with detailed information:
+         - Exactly which information is missing or what problem occurred
+         - Clear identification of the company and position
+         - Specific form fields or questions that couldn't be completed
+         - Any screenshot or evidence that might help the user understand the issue
+
+      2. After logging the issue, DO NOT wait for resolution:
+         - Skip the problematic application
+         - Continue with other applications in the queue
+         - If multiple issues occur with the same application, log each one separately
+
+      IMPORTANT: The UserAssistanceAgent will return a message indicating success and instructing
+      you to proceed to the next application. This is your cue to CONTINUE with the task. 
+      Do NOT consider the entire job application task completed just because an issue was logged.
+      Your goal is to apply to multiple jobs, not stop after the first issue.
+
+      When a significant percentage of applications encounter similar issues:
+      - Log a summary issue explaining the pattern
+      - Consider moving to different job types or platforms
+
+      IMPORTANT: This is an automated background process. You should NEVER wait for user input to continue. Your goal is to maximize successful applications while clearly documenting issues for later review.
 
       Here is an overview of high-level steps you might take to accomplish the task:
       1. Use the `PlanningAgent` tool to break down the user's request into smaller tasks.

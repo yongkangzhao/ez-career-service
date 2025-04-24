@@ -3,6 +3,7 @@ import os
 import threading
 import time
 import queue
+import json
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,6 +21,7 @@ from pydantic import BaseModel
 
 from mcp_server_manager import MCPServerManager
 from tool_agents.orchestrator_agent import create_orchestrator_agent
+from supabase import create_client
 
 APP_CONFIG_PATH = os.getenv("APP_CONFIG_PATH", "agents_config.yaml")
 
@@ -124,6 +126,11 @@ class TaskResultResponse(BaseModel):
     trace_id: str
     status: str # e.g., "pending", "completed", "failed", "cancelled"
     result: Optional[str] = None
+
+
+class ReprocessRequest(BaseModel):
+    issue_id: str
+    additional_info: Dict[str, Any] = {}
 
 
 def create_generic_agent(
@@ -581,6 +588,63 @@ async def get_task_result(trace_id: str):
         # Task not found (either never existed or already cleaned up)
         print(f"DEBUG: Task {trace_id} not found.")
         raise HTTPException(status_code=404, detail=f"Task {trace_id} not found")
+
+
+@app.post("/reprocess_application", response_model=OrchestrateResponse)
+async def reprocess_application(
+    payload: ReprocessRequest,
+    background_tasks: BackgroundTasks,
+    orchestrator: Agent = Depends(get_orchestrator)
+):
+    """
+    Reprocess an application that previously had issues
+    """
+    try:
+        # Get the issue details from Supabase
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+        supabase_client = create_client(supabase_url, supabase_key)
+        
+        response = supabase_client.table("application_issues").select("*").eq("id", payload.issue_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Issue not found")
+            
+        issue = response.data[0]
+        
+        # Create a new trace ID
+        request_trace_id = f"trace_{uuid.uuid4().hex}"
+        
+        # Create a specific task for this reprocessing
+        task = (
+            f"Reprocess application for {issue['position']} at {issue['company']}. "
+            f"Previous issue was: {issue['issue_type']}: {issue['issue_details']}. "
+            f"Additional information has been provided: {json.dumps(payload.additional_info)}. "
+            f"Focus specifically on completing this application with the new information."
+        )
+        
+        # Update the issue as resolved
+        supabase_client.table("application_issues").update({
+            "status": "resolved",
+            "resolved_at": supabase_client.table("application_issues").sql("now()"),
+            "resolution_note": f"Reprocessing initiated with additional information: {json.dumps(payload.additional_info)}"
+        }).eq("id", payload.issue_id).execute()
+        
+        # Create a new task for the agent
+        agent_task = asyncio.create_task(
+            run_agent_task_background(orchestrator, task, request_trace_id)
+        )
+        
+        # Register the task
+        app_state["active_tasks"][request_trace_id] = agent_task
+        
+        print(f"INFO: Reprocessing application for issue {payload.issue_id} with trace_id {request_trace_id}")
+        
+        return OrchestrateResponse(trace_id=request_trace_id, status="accepted")
+        
+    except Exception as e:
+        print(f"ERROR: Failed to reprocess application: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reprocessing application: {str(e)}")
 
 
 if __name__ == "__main__":

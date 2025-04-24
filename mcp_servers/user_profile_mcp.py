@@ -364,6 +364,65 @@ def get_resume_content() -> Dict[str, Any]:
             "message": f"Error processing resume: {str(e)}"
         }
 
+@mcp.tool()
+def get_application_details() -> Dict[str, Any]:
+    """
+    Retrieve comprehensive application details to minimize missing information issues.
+    Collects all available profile data and application preferences.
+    
+    Returns:
+        Dictionary with all available user information for job applications
+    """
+    try:
+        # Query the user's complete profile
+        response = supabase.table("profiles").select("*").eq("user_id", user_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            return {
+                "success": False,
+                "message": f"No profile found for user ID: {user_id}"
+            }
+            
+        profile = response.data[0]
+        
+        # Get additional application preferences if available
+        # Note: You may need to create this table in your Supabase database
+        pref_response = supabase.table("application_preferences").select("*").eq("user_id", user_id).execute()
+        preferences = pref_response.data[0] if pref_response.data and len(pref_response.data) > 0 else {}
+        
+        # Get education information
+        edu_response = supabase.table("education").select("*").eq("user_id", user_id).execute()
+        education = edu_response.data if edu_response.data else []
+        
+        # Get work experience
+        exp_response = supabase.table("experience").select("*").eq("user_id", user_id).execute()
+        experience = exp_response.data if exp_response.data else []
+        
+        # Get skills
+        skills_response = supabase.table("skills").select("*").eq("user_id", user_id).execute()
+        skills = skills_response.data if skills_response.data else []
+        
+        # Combine all available information for applications
+        application_data = {
+            "profile": profile,
+            "preferences": preferences,
+            "education": education,
+            "experience": experience,
+            "skills": skills,
+            "available_fields": [key for key in profile if profile[key] is not None]
+        }
+        
+        return {
+            "success": True,
+            "application_data": application_data,
+            "message": "Application details retrieved successfully"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error retrieving application details: {str(e)}"
+        }
+
 if __name__ == "__main__":
     mcp.run(transport='stdio')
 
