@@ -104,7 +104,7 @@ def get_current_user_profile() -> Dict[str, Any]:
         user_id = current_user_session.user.id
         
         # Fetch the profile using the existing get_user_profile function
-        return get_user_profile(user_id)
+        return get_user_profile()
     except Exception as e:
         return {
             "success": False,
@@ -112,7 +112,7 @@ def get_current_user_profile() -> Dict[str, Any]:
         }
 
 @mcp.tool()
-def get_resume() -> Dict[str, Any]:
+def get_resume_path() -> Dict[str, Any]:
     """
     Retrieve the user's resume URL from the Supabase profile table.
     
@@ -129,8 +129,28 @@ def get_resume() -> Dict[str, Any]:
         if response.data and len(response.data) > 0:
             resume_url = response.data[0].get("resume_url")
             if resume_url:
+                # download the resume file
+                # save it to a temporary location
+                # return the resume path
+
+                #download the resume file
+                response = requests.get(resume_url)
+                if response.status_code != 200:
+                    return {
+                        "success": False,
+                        "message": f"Failed to download resume: HTTP {response.status_code}"
+                    }
+                # Save PDF to a temporary file that will be persisted with meaningful name
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
+                    temp_file.write(response.content)
+                    temp_file_path = temp_file.name
+
+                # Return the resume URL
+                # Clean up the temporary file
+
                 return {
                     "success": True,
+                    "resume_path": temp_file_path,
                     "resume_url": resume_url,
                     "message": "Resume URL retrieved successfully"
                 }
@@ -251,7 +271,7 @@ def get_resume_content() -> Dict[str, Any]:
     
     try:
         # First, get the resume URL
-        resume_result = get_resume(user_id)
+        resume_result = get_resume()
         
         if not resume_result.get("success"):
             return resume_result  # Return the error from get_resume
@@ -346,3 +366,42 @@ def get_resume_content() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     mcp.run(transport='stdio')
+
+    # # get resume_path()
+
+    # supabase_url = os.getenv("SUPABASE_URL")
+    # supabase_key = os.getenv("SUPABASE_KEY")
+    # supabase = create_client(supabase_url, supabase_key)
+
+    # # Authenticate with Supabase
+    # auth_response = supabase.auth.sign_in_with_password({
+    #     "email": DEFAULT_EMAIL,
+    #     "password": DEFAULT_PASSWORD
+    # })
+    # user_id = auth_response.user.id
+    # user_email = auth_response.user.email
+
+    # # Store the session for future use
+    # current_user_session = auth_response.session
+    # print(f"Authenticated as {user_email} with user ID {user_id}")
+
+    # # Test the functions
+    # auth_result = authenticate(user_email, user_password)
+    # print(f"Authentication result: {auth_result}")
+
+    # profile_result = get_current_user_profile()
+    # print(f"Profile result: {profile_result}")
+
+    # resume_result = get_resume_path()
+    # print(f"Resume result: {resume_result}")
+
+    # name_result = get_full_name()
+    # print(f"Name result: {name_result}")
+
+    # user_profile_result = get_user_profile()
+    # print(f"User profile result: {user_profile_result}")
+
+    # resume_content_result = get_resume_content()
+    # print(f"Resume content result: {resume_content_result}")
+
+    # # mcp.run(transport='stdio')

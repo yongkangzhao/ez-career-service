@@ -4,15 +4,15 @@
 # --- Define MCP Servers ---
 # Dictionary where keys are unique identifiers used by agents in 'mcp_server_key'.
 mcp_servers:
-  # playwright_mcp: # Unique key for the Playwright server
-  #   type: sse # sse / stdio
-  #   params:
-  #     # REQUIRED: URL for the server
-  #     url: http://localhost:8931/sse
-  #     # Optional: Name used in logs/tracing for this specific server instance
-  #     name: Playwright MCP Server
-  #     # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
-  #     # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
+  playwright_mcp: # Unique key for the Playwright server
+    type: sse # sse / stdio
+    params:
+      # REQUIRED: URL for the server
+      url: http://localhost:8931/sse
+      # Optional: Name used in logs/tracing for this specific server instance
+      name: Playwright MCP Server
+      # Optional: Add other parameters needed by MCPServerSse 'params' dictionary if required
+      # headers: { Authorization: "Bearer YOUR_PLAYWRIGHT_TOKEN" } # Example
 
   browser_use_mcp:
     type: stdio
@@ -46,8 +46,8 @@ mcp_servers:
 # --- Define Agents ---
 tool_agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
-    model: gpt-4.1-mini
-    mcp_server_key: browser_use_mcp
+    model: o4-mini-2025-04-16
+    mcp_server_key: playwright_mcp
       user_profile_mcp
       supabase_mcp
     # Renamed field for tool description override:
@@ -56,25 +56,28 @@ tool_agents:
       instructions: >
         You are an expert browser controller.
 
-        You have access to three tools: browser_use_mcp, user_profile_mcp, and supabase_mcp.
-
-        You can use the browser_use_mcp to control the browser. You should NEVER give the browser_use_mcp a complicated instruction (e.g. "Search up XXX and apply for XXX"). Instead, give frequent yet concise instructions. Example instructions include:
+        You can use the browser_use tool to control the browser. You should NEVER give the browser_use_mcp a complicated instruction (e.g. "Search up XXX and apply for XXX"). Instead, give frequent yet concise instructions. Example instructions include:
         - "Tell me what is showing on the screen."
         - "Fill in the form as follows. Name: Bob, Age: 20, Email: bob@gmail.com."
         - "Click on the Submit button."
-        When you are given a very open ended task, such as "search for jobs", it is your job to break it down into smaller tasks, and assign these small tasks sequentially to the browser_use_mcp. Also, do not attempt to upload resume using browser_use_mcp (it is not possible). If it is on LinkedIn, use user's saved resume on LinkedIn. Otherwise, if the only option is to upload a resume through file selector, skip this job and find another one.
-        
-        You can use the user_profile_mcp to fetch user's profile information. While using browser_use_mcp, you may encounter forms where you need to fill in information. Do not ask browser_use_mcp from filling in arbitrary values. You should read these information from user_profile_mcp, and provide the information to browser_use_mcp. You have access to the first name, last name, email, phone number, and resume (not the pdf, only the text content) of the user. If there are required information that is not present in user_profile_mcp, stop the application process for this job and move on to the next one.
+        - "Click on next back button."
+        - "upload the resume from the path: /path/to/resume.pdf."
 
-        When you have successfully submitted a job application, do not stop or leave immediately. You must first use the supabase_mcp to record the position_title and the company_name of the job you just applied to on the database.
+        When applying jobs it may encounter forms where you need to fill in information. Do not ask start filling in arbitrary values. You should try to get these information from other tools, and provide the information to the tool. You have access to the first name, last name, email, phone number, and resume (not the pdf, only the text content) of the user. If there are required information that is not present in other tools, stop the application process for this job and move on to the next one.
+        When resume file upload is needed use the browser_file_upload() tool to do so.
+        When you have successfully submitted a job application, do not stop or leave immediately.
+        You must use the insert_application tool to record the position_title and the company_name of the job you just successfully applied.
+
+        When uploading resume, during application process, ask the get_resume_path tool to provide you with the path to the resume file.
+        Then provide the path to browser_use tool, and ask it to upload the resume file.
 
         Important Notes:
-          When searching on LinkedIn remember to hit Enter to trigger the search. There's no button to click.
+          When searching jobs on LinkedIn jobs page, remember to hit Enter to trigger the search. There's no button to click.
           After each action, you should wait for the page to load, and then check if the action was successful.
           Some webpages may require you to wait for a specific element to load before proceeding.
           Some webpage elements are very volitile, and may require you to retry many times before succeeding, be patient, and keep trying.
 
-        Tools to avoid using:
+        Do not ask the user to interact with the browser. You are the one who is in control of the browser. User doesn't have direct access to the browser.
 
       model_settings:
         tool_choice: required
@@ -82,7 +85,7 @@ tool_agents:
       handoff_description: Controls a web browser (navigation, screenshots, interaction).
 
   - name: PlanningAgent # This name WILL be used as the tool_name
-    model: gpt-4.1-nano
+    model: o4-mini-2025-04-16
     # Renamed field for tool description override:
     description: Use this Agent to break down a complex goal into smaller steps understandable by other tools.
     parameters:
@@ -95,6 +98,15 @@ tool_agents:
         You are encouraged to come up with a partial plan to start with, and then ask the user to come back to you after trying to do them. Then you can come up with the next steps.
         The key is to be dynamic and flexible, and to be able to adapt to the user's needs, and the results of the previous steps.
         Try to keep the plan as simple as possible, and to avoid overcomplicating it.
+
+        background knowledge:
+        Go to the following URL for uploading resume:
+        https://www.linkedin.com/jobs/application-settings/ 
+
+        Go to the following URL for job search:
+        will need to enter at least one of the job title or location. and press enter to search.
+        https://www.linkedin.com/jobs/
+
       model_settings:
         temperature: 0.4
       # Optional fallback:
@@ -102,7 +114,7 @@ tool_agents:
 
 orchestrator_agent:
   name: OrchestratorAgent # This name WILL be used as the tool_name
-  model: gpt-4.1
+  model: o4-mini-2025-04-16
   # Renamed field for tool description override:
   description: Use this Agent to orchestrate the other agents.
   parameters:
@@ -153,6 +165,13 @@ orchestrator_agent:
 
       Permissions:
       - You have permission to create accounts on behalf of the user, but you must make sure to store credentials inside the memory.
+
+      Do not seek permission from the user to do anything. You have already been given permission to do everything.
+
+      For example:
+      Do NOT ask "Shall I proceed with Step 1: updating your LinkedIn resume by uploading the new version?" just do it.
+      Note planner has given you a plan, begin executing it step by step immediately.
+
     model_settings:
       temperature: 0.0
       tool_choice: required

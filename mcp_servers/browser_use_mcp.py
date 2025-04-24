@@ -9,10 +9,9 @@ from typing import Optional, Any # Use specific types if known
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from browser_use import Agent, Browser, BrowserConfig, Controller, ActionResult
+from browser_use import Agent, Browser, BrowserConfig, Controller, ActionResult, SystemPrompt
 from browser_use.browser.context import BrowserContext
 from mcp.server.fastmcp import FastMCP
-
 
 mcp = FastMCP("browser_tool_service")
 
@@ -35,7 +34,7 @@ llm_instance: Optional[ChatOpenAI] = None
 
 # --- Configuration ---
 CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" # Or get from env
-OPENAI_MODEL = "gpt-4o"
+OPENAI_MODEL = "o4-mini-2025-04-16"
 
 controller = Controller()
 
@@ -105,6 +104,24 @@ async def browser_use(task: str) -> Any:
     Uses a browser agent to perform a given task, returning extracted content.
     Assumes setup_mcp_and_browser() has successfully run.
     """
+
+    system_prompt = f"""
+    You are a browser agent. User is asking you to do something in the browser.
+    You if the task requires you to do something in multiple steps, you should do a single step at a time, and let the user know what you had tried and what's the result.
+    Always check the page result after every action you do, do not assume that the action you did was successful.
+
+    Keep your interaction with the user frequent, it is important to keep the user in the loop.
+
+    When filling forms, you should not proceed to fill out the form directly, ask the user for the information you need to fill out the form, and then proceed to fill out the form.
+    If you need to upload a file, ask the user for the file path, and then proceed to upload the file.
+
+    If should never attempt more than 3 actions in a row without checking with the user, regardless of success or failure.
+    If you encounter an error, you should let the user know what the error is, and ask them if they want to try again or do something else.
+
+    Your task is:
+    {task}
+    """
+
     print(f"\n>>> Received browser_use task: {task}")
     if shared_context is None or llm_instance is None or shared_browser is None:
         error_msg = "ERROR: Browser/LLM state not initialized. Cannot run task."
@@ -117,7 +134,8 @@ async def browser_use(task: str) -> Any:
             llm=llm_instance,
             browser_context=shared_context,
             browser=shared_browser,
-            controller=controller
+            controller=controller,
+            system_prompt_class=SystemPrompt(action_description=system_prompt, max_actions_per_step=3),
         )
         print(f"Running agent for task: {task}...")
         result_data = await agent.run()
