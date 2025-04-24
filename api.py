@@ -403,62 +403,6 @@ async def run_orchestration_endpoint(
     return OrchestrateResponse(trace_id=request_trace_id, status="accepted")
 
 
-async def cancel_task(trace_id: str) -> Tuple[bool, str]:
-    """
-    Helper function to cancel a task and handle cleanup.
-    Returns a tuple of (success, message).
-    """
-    # Detailed logging of active tasks
-    active_tasks = list(app_state["active_tasks"].keys())
-    print(f"DEBUG: Current active tasks: {active_tasks}")
-    print(f"DEBUG: Attempting to cancel task with trace_id: {trace_id}")
-    
-    if trace_id not in app_state["active_tasks"]:
-        print(f"DEBUG: Could not find task with trace_id: {trace_id}")
-        return False, f"No active task found with trace_id: {trace_id}"
-    
-    try:
-        # Get the task and cancel it
-        task = app_state["active_tasks"][trace_id]
-        print(f"DEBUG: Found task {trace_id}, cancelling...")
-        
-        # More aggressive cancellation approach
-        try:
-            # Attempt to cancel the task
-            task.cancel()
-            print(f"DEBUG: Task {trace_id} cancel() called")
-            
-            # Remove from active tasks
-            del app_state["active_tasks"][trace_id]
-            print(f"INFO: Task {trace_id} cancelled successfully")
-            
-            return True, f"Task with trace_id {trace_id} has been cancelled"
-        except asyncio.CancelledError:
-            # This is actually expected and a good sign the cancellation worked
-            print(f"DEBUG: Task {trace_id} raised CancelledError - this is normal during cancellation")
-            
-            # Remove from active tasks if still there
-            if trace_id in app_state["active_tasks"]:
-                del app_state["active_tasks"][trace_id]
-                
-            return True, f"Task with trace_id {trace_id} has been cancelled (CancelledError caught)"
-            
-    except Exception as e:
-        print(f"ERROR: Failed to cancel task {trace_id}: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Try to clean up even if cancellation failed
-        if trace_id in app_state["active_tasks"]:
-            try:
-                del app_state["active_tasks"][trace_id]
-                print(f"DEBUG: Removed task from active_tasks despite cancellation error")
-            except Exception as cleanup_error:
-                print(f"ERROR: Failed to remove task from active_tasks: {cleanup_error}")
-                
-        return False, f"Failed to cancel task: {str(e)}"
-
-
 @app.post("/cancel", response_model=CancelResponse)
 async def cancel_orchestration_endpoint(payload: CancelRequest):
     """
