@@ -5,7 +5,7 @@ CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 REMOTE_PORT=9222
 MCP_PORT=8931
 
-# 0) If Chrome’s running, quit it so our flags actually stick
+# 0) If Chrome's running, quit it so our flags actually stick
 if pgrep -x "Google Chrome" >/dev/null; then
   echo "⚠️  Quitting existing Chrome…"
   pkill -x "Google Chrome"
@@ -13,7 +13,7 @@ if pgrep -x "Google Chrome" >/dev/null; then
   sleep 1
 fi
 
-# 1) Capture Chrome’s output so we can grab the DevTools ws:// URL
+# 1) Capture Chrome's output so we can grab the DevTools ws:// URL
 OUT=$(mktemp)
 trap 'rm -f "$OUT"; pkill -P $$ >/dev/null 2>&1' EXIT
 
@@ -37,7 +37,12 @@ npx @playwright/mcp@latest \
 MCP_PID=$!
 echo "✅ Playwright MCP running (PID $MCP_PID)"
 
+# Wait for the Playwright MCP server to initialize
+echo "⏳ Waiting for Playwright MCP to initialize..."
+sleep 5  # Wait 5 seconds for the MCP server to start up
+
 # 6) Finally, start your FastAPI server (Uvicorn stays in the foreground)
+echo "🚀 Starting FastAPI server..."
 uvicorn api:app \
   --reload \
   --port 8000 \
