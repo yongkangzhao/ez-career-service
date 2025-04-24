@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-conda activate ez-career-service
 set -euo pipefail
 
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
