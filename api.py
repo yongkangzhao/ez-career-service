@@ -13,8 +13,18 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple, Union
 import traceback
-from braintrust import init_logger
-from braintrust.wrappers.openai import BraintrustTracingProcessor
+try:
+    from braintrust import init_logger
+    from braintrust.wrappers.openai import BraintrustTracingProcessor
+except ImportError:
+    print("WARNING: Braintrust package not found. Tracing will be disabled.")
+    BraintrustTracingProcessor = None
+try:
+    import weave
+    from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
+except ImportError:
+    print("WARNING: Weave package not found. Tracing will be disabled.")
+    WeaveTracingProcessor = None
 
 
 import yaml
@@ -346,7 +356,11 @@ async def run_agent_task_background(
     """Runs the agent task and stores the result or error, with tracing."""
     # The trace block wraps the core logic including error handling for that logic
     if os.environ.get("BRAINTRUST_API_KEY"):
-        set_trace_processors([BraintrustTracingProcessor(init_logger("openai-agent"))])
+        if BraintrustTracingProcessor:
+            set_trace_processors([BraintrustTracingProcessor(init_logger("ez-career"))])
+    if WeaveTracingProcessor:
+        weave.init("ez-career")
+        set_trace_processors([WeaveTracingProcessor()])
     with trace(f"Agent Execution - {trace_id}", trace_id=trace_id):
         print(f"BACKGROUND: Starting task {trace_id} inside trace block")
         try:

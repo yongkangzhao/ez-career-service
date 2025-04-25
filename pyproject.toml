@@ -14,6 +14,7 @@ dependencies = [
     "PyMuPDF>=1.25.0",
     "supabase>=2.15.0",
     "braintrust>=0.0.201",
+    "weave>=0.51.44",
 ]
 
 [build-system]

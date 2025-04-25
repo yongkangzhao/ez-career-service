@@ -117,6 +117,8 @@ tool_agents:
         The key is to be dynamic and flexible, and to be able to adapt to the user's needs, and the results of the previous steps.
         Try to keep the plan as simple as possible, and to avoid overcomplicating it.
 
+        It is might be useful to use get_resume_content tool to understand the user better.
+
         Background knowledge:
         Go to the following URL for uploading resume if applying for a job on LinkedIn:
         https://www.linkedin.com/jobs/application-settings/ 
