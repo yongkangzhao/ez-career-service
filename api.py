@@ -345,7 +345,8 @@ async def run_agent_task_background(
 ):
     """Runs the agent task and stores the result or error, with tracing."""
     # The trace block wraps the core logic including error handling for that logic
-    set_trace_processors([BraintrustTracingProcessor(init_logger("openai-agent"))])
+    if os.environ.get("BRAINTRUST_API_KEY"):
+        set_trace_processors([BraintrustTracingProcessor(init_logger("openai-agent"))])
     with trace(f"Agent Execution - {trace_id}", trace_id=trace_id):
         print(f"BACKGROUND: Starting task {trace_id} inside trace block")
         try:
