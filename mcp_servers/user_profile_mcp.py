@@ -271,7 +271,7 @@ def get_resume_content() -> Dict[str, Any]:
     
     try:
         # First, get the resume URL
-        resume_result = get_resume()
+        resume_result = get_resume_path()
         
         if not resume_result.get("success"):
             return resume_result  # Return the error from get_resume

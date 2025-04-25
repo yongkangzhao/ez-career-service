@@ -12,9 +12,13 @@ import uuid
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple, Union
+import traceback
+from braintrust import init_logger
+from braintrust.wrappers.openai import BraintrustTracingProcessor
+
 
 import yaml
-from agents import Agent, ItemHelpers, MessageOutputItem, ModelSettings, Runner, trace
+from agents import Agent, ItemHelpers, MessageOutputItem, ModelSettings, Runner, trace, set_trace_processors
 from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -337,47 +341,65 @@ def get_orchestrator() -> Agent:
 async def run_agent_task_background(
     orchestrator: Agent, 
     task_str: str, 
-    trace_id: str
+    trace_id: str # Already passed in, perfect!
 ):
-    """Runs the agent task and stores the result or error."""
-    print(f"BACKGROUND: Starting task {trace_id}")
-    try:
-        result = await Runner.run(orchestrator, task_str, max_turns=100)
-        
-        final_output = result.final_output
-        if not final_output:
-            for item in reversed(result.new_items):
-                if isinstance(item, MessageOutputItem):
-                    text = ItemHelpers.text_message_output(item)
-                    if text:
-                        final_output = text
-                        break
+    """Runs the agent task and stores the result or error, with tracing."""
+    # The trace block wraps the core logic including error handling for that logic
+    set_trace_processors([BraintrustTracingProcessor(init_logger("openai-agent"))])
+    with trace(f"Agent Execution - {trace_id}", trace_id=trace_id):
+        print(f"BACKGROUND: Starting task {trace_id} inside trace block")
+        try:
+            # --- Core Agent Logic ---
+            result = await Runner.run(orchestrator, task_str, max_turns=100)
+
+            final_output = result.final_output
+            # Find output if not directly available (same logic as before)
             if not final_output:
-                final_output = "Orchestration completed, no specific output."
-        
-        app_state["task_results"][trace_id] = {"status": "completed", "result": final_output}
-        print(f"BACKGROUND: Task {trace_id} completed successfully.")
-        
-    except asyncio.CancelledError:
-        app_state["task_results"][trace_id] = {"status": "cancelled", "result": "Task was cancelled"}
-        print(f"BACKGROUND: Task {trace_id} was cancelled.")
-        
-    except Exception as e:
-        print(f"BACKGROUND ERROR: Task {trace_id} failed: {e}")
-        import traceback
-        traceback.print_exc()
-        app_state["task_results"][trace_id] = {"status": "failed", "result": f"Internal server error: {str(e)}"}
-        
-    finally:
-        # Clean up the task from active_tasks *after* it finishes/fails/is cancelled
-        if trace_id in app_state["active_tasks"]:
-            try:
-                del app_state["active_tasks"][trace_id]
-                print(f"BACKGROUND: Removed task {trace_id} from active_tasks.")
-            except KeyError:
-                print(f"BACKGROUND WARNING: Task {trace_id} already removed from active_tasks.")
-        else:
-             print(f"BACKGROUND WARNING: Task {trace_id} not found in active_tasks for final cleanup.")
+                for item in reversed(result.new_items):
+                    if isinstance(item, MessageOutputItem): # Use your actual class
+                        text = ItemHelpers.text_message_output(item) # Use your actual helper
+                        if text:
+                            final_output = text
+                            break
+                if not final_output:
+                    final_output = "Orchestration completed, no specific output."
+            
+            # Store successful result
+            app_state["task_results"][trace_id] = {"status": "completed", "result": final_output}
+            print(f"BACKGROUND: Task {trace_id} completed successfully.")
+            # --- End Core Agent Logic ---
+
+        except asyncio.CancelledError:
+            # Handle cancellation specifically (occurs if task.cancel() is called)
+            app_state["task_results"][trace_id] = {"status": "cancelled", "result": "Task was cancelled"}
+            print(f"BACKGROUND: Task {trace_id} was cancelled.")
+            # Optionally re-raise if the trace context manager needs to know about cancellation
+            # raise 
+
+        except Exception as e:
+            # Handle other exceptions during agent execution
+            print(f"BACKGROUND ERROR: Task {trace_id} failed: {e}")
+            traceback.print_exc() # Log the full traceback
+            app_state["task_results"][trace_id] = {"status": "failed", "result": f"Internal server error: {str(e)}"}
+            # The exception will be caught by the trace context manager's try...except if it's configured to do so
+            # No need to re-raise here unless needed for outer layers not shown
+
+        finally:
+            # This finally block ensures cleanup happens regardless of success, failure, or cancellation.
+            # It runs *after* the main try/except blocks within the 'with trace' block complete.
+            if trace_id in app_state["active_tasks"]:
+                try:
+                    del app_state["active_tasks"][trace_id]
+                    print(f"BACKGROUND: Removed task {trace_id} from active_tasks.")
+                except KeyError:
+                    # This might happen in race conditions if cancellation occurs right near completion
+                    print(f"BACKGROUND WARNING: Task {trace_id} already removed from active_tasks during final cleanup.")
+            else:
+                 print(f"BACKGROUND WARNING: Task {trace_id} not found in active_tasks for final cleanup.")
+            
+            print(f"BACKGROUND: Final cleanup for task {trace_id} finished.")
+            # The 'with trace(...)' block finishes after this 'finally' block completes.
+
 
 
 @app.post("/orchestrate", response_model=OrchestrateResponse, status_code=202)

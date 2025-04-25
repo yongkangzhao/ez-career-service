@@ -66,7 +66,7 @@ tool_agents:
         - "Fill in the form as follows. Name: Bob, Age: 20, Email: bob@gmail.com."
         - "Click on the Submit button."
         - "Click on next back button."
-        - "upload the resume from the path: /path/to/resume.pdf."
+        - "upload the resume from the path provided by the get_resume_path tool."
 
         When applying jobs it may encounter forms where you need to fill in information. Do not ask start filling in arbitrary values. You should try to get these information from other tools, and provide the information to the tool. You have access to the first name, last name, email, phone number, and resume (not the pdf, only the text content) of the user. If there are required information that is not present in other tools, stop the application process for this job and move on to the next one.
         When resume file upload is needed use the browser_file_upload() tool to do so.
@@ -91,6 +91,9 @@ tool_agents:
           After each action, you should wait for the page to load, and then check if the action was successful.
           Some webpages may require you to wait for a specific element to load before proceeding.
           Some webpage elements are very volitile, and may require you to retry many times before succeeding, be patient, and keep trying.
+          everytime you finish your task, you should clearly state what you have done, and what's the result, what are the key information you have got.
+          For example, when you navigate to a webpage, you should say "I have navigated to the webpage, and the title of the page is XXX. The URL is XXX. The content of the page is XXX."
+          When you are done with a task, you should say "I am done with this task, and I am ready for the next one." Otherwise, the orchestrator will not know what's available, and will be hard to plan what to do next.
 
         Do not ask the user to interact with the browser. You are the one who is in control of the browser. User doesn't have direct access to the browser.
 
@@ -101,6 +104,7 @@ tool_agents:
 
   - name: PlanningAgent # This name WILL be used as the tool_name
     model: o4-mini-2025-04-16
+    mcp_server_key: "user_profile_mcp"
     # Renamed field for tool description override:
     description: Use this Agent to break down a complex goal into smaller steps understandable by other tools.
     parameters:
@@ -109,13 +113,12 @@ tool_agents:
         of smaller, actionable steps. Each step should be clearly achievable by
         one of the available tool agents (like the browser agent).
         Present the plan clearly.
-        Notice that you do not need to come up with a full plan in one go.
         You are encouraged to come up with a partial plan to start with, and then ask the user to come back to you after trying to do them. Then you can come up with the next steps.
         The key is to be dynamic and flexible, and to be able to adapt to the user's needs, and the results of the previous steps.
         Try to keep the plan as simple as possible, and to avoid overcomplicating it.
 
-        background knowledge:
-        Go to the following URL for uploading resume:
+        Background knowledge:
+        Go to the following URL for uploading resume if applying for a job on LinkedIn:
         https://www.linkedin.com/jobs/application-settings/ 
 
         Go to the following URL for job search:
@@ -199,9 +202,10 @@ orchestrator_agent:
 
       **CRITICAL EXECUTION REQUIREMENT:** 
       When you use the PlanningAgent, you MUST NOT consider the task completed after obtaining a plan. The plan is only the first step. You MUST EXECUTE the plan by using the appropriate tools (primarily BrowserToolAgent) to carry out each step of the plan sequentially. Creating a plan is never the final output - you must continue with implementation by:
-      1. Using BrowserToolAgent to navigate to websites, fill forms, and submit applications
-      2. Using UserProfileAgent to retrieve user information needed for applications
-      3. Using UserAssistanceAgent to log issues when encountered
+      1. Using BrowserToolAgent to retrieve user information
+      2. Using PlanningAgent to break down the user's request into smaller tasks
+      3. Using BrowserToolAgent to navigate to websites, fill forms, and submit applications
+      4. Using UserAssistanceAgent to log issues when encountered
 
       Only after performing concrete actions through these tools should the task be considered complete. DO NOT stop after planning.
 
