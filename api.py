@@ -29,9 +29,12 @@ except ImportError:
 
 import yaml
 from agents import Agent, ItemHelpers, MessageOutputItem, ModelSettings, Runner, trace, set_trace_processors
-from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks
+from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import tempfile
+import fitz  # PyMuPDF
+from openai import OpenAI
 
 from mcp_server_manager import MCPServerManager
 from tool_agents.orchestrator_agent import create_orchestrator_agent
@@ -145,6 +148,10 @@ class TaskResultResponse(BaseModel):
 class ReprocessRequest(BaseModel):
     issue_id: str
     additional_info: Dict[str, Any] = {}
+
+
+class ParseResponse(BaseModel):
+    markdown: str
 
 
 def create_generic_agent(
@@ -682,6 +689,76 @@ async def reprocess_application(
     except Exception as e:
         print(f"ERROR: Failed to reprocess application: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error reprocessing application: {str(e)}")
+
+
+@app.post("/parse", response_model=ParseResponse)
+async def parse_pdf_to_markdown(file: UploadFile = File(...)):
+    """
+    Endpoint to parse a PDF file into markdown format using GPT-4o.
+    
+    Args:
+        file: The PDF file to parse
+        
+    Returns:
+        A ParseResponse containing the markdown text
+    """
+
+    # Check if file is a PDF
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    try:
+        # Save the uploaded file to a temporary location
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+        
+        # Extract text from PDF using PyMuPDF
+        try:
+            pdf_document = fitz.open(temp_file_path)
+            pdf_text = ""
+            
+            for page_num in range(len(pdf_document)):
+                page = pdf_document.load_page(page_num)
+                pdf_text += page.get_text()
+                
+            pdf_document.close()
+        except Exception as e:
+            # Clean up the temporary file
+            os.unlink(temp_file_path)
+            raise HTTPException(status_code=500, detail=f"Error extracting text from PDF: {str(e)}")
+        
+        # Clean up the temporary file
+        os.unlink(temp_file_path)
+        
+        # Initialize OpenAI client
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+        
+        client = OpenAI(api_key=openai_api_key)
+        
+        # Call GPT-4o to convert text to markdown
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that converts PDF text into well-formatted markdown. Preserve the structure and formatting from the original document as much as possible."},
+                    {"role": "user", "content": f"Please convert the following PDF text to markdown format, preserving structure and formatting as much as possible:\n\n{pdf_text}"}
+                ],
+                temperature=0.0
+            )
+            
+            markdown_text = response.choices[0].message.content
+            
+            return ParseResponse(markdown=markdown_text)
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {str(e)}")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
 
 if __name__ == "__main__":

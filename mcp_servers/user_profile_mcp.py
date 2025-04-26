@@ -250,118 +250,40 @@ def get_user_profile() -> Dict[str, Any]:
 @mcp.tool()
 def get_resume_content() -> Dict[str, Any]:
     """
-    Fetch the user's resume, convert it to image, analyze with GPT-4o,
-    and return a structured text representation of the resume content.
+    Fetch the user's resume content directly from the resume_text column in the profiles table.
     
     Args:
-        user_id: The ID of the user whose resume content to analyze
+        user_id: The ID of the user whose resume content to retrieve
         
     Returns:
-        A dictionary containing the structured resume content and status information
+        A dictionary containing the resume content and status information
     """
-    # Initialize OpenAI client
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        return {
-            "success": False,
-            "message": "OPENAI_API_KEY environment variable not set"
-        }
-    
-    client = OpenAI(api_key=openai_api_key)
-    
     try:
-        # First, get the resume URL
-        resume_result = get_resume_path()
+        # Query the user's profile from the database to get resume_text
+        response = supabase.table("profiles").select("resume_text").eq("user_id", user_id).execute()
         
-        if not resume_result.get("success"):
-            return resume_result  # Return the error from get_resume
-        
-        resume_url = resume_result.get("resume_url")
-        
-        # Download the PDF file
-        response = requests.get(resume_url)
-        if response.status_code != 200:
-            return {
-                "success": False,
-                "message": f"Failed to download resume: HTTP {response.status_code}"
-            }
-        
-        # Save PDF to a temporary file
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
-            temp_file.write(response.content)
-            temp_file_path = temp_file.name
-        
-        try:
-            # Open the PDF with PyMuPDF
-            pdf_document = fitz.open(temp_file_path)
-            
-            # Convert pages to images
-            base64_images = []
-            for page_num in range(min(len(pdf_document), 5)):  # Limit to 5 pages max
-                page = pdf_document.load_page(page_num)
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # Higher resolution
-                img_data = pix.tobytes("png")
-                base64_image = base64.b64encode(img_data).decode('utf-8')
-                base64_images.append(base64_image)
-            
-            # Close the PDF
-            pdf_document.close()
-            
-            # If we have images, send them to GPT-4o
-            if base64_images:
-                # Prepare messages for GPT-4o
-                messages = [
-                    {
-                        "role": "system", 
-                        "content": "You are an expert at parsing resumes. Extract all relevant information from this resume image and organize it into a structured format with sections for: personal information, education, work experience, skills, certifications, projects, and any other relevant categories. Maintain the hierarchical structure of the resume in your response and ensure all dates, titles, and details are accurately captured."
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "Parse this resume and return the structured content:"}
-                        ]
-                    }
-                ]
-                
-                # Add images to the user message
-                for i, img in enumerate(base64_images):
-                    messages[1]["content"].append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{img}",
-                            "detail": "high"
-                        }
-                    })
-                
-                # Call GPT-4o to analyze the resume
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=messages,
-                    max_tokens=4000,
-                    temperature=0.0,
-                )
-                
-                resume_content = response.choices[0].message.content
-                
+        if response.data and len(response.data) > 0:
+            resume_text = response.data[0].get("resume_text")
+            if resume_text:
                 return {
                     "success": True,
-                    "resume_content": resume_content,
-                    "message": "Resume parsed successfully"
+                    "resume_content": resume_text,
+                    "message": "Resume content retrieved successfully"
                 }
             else:
                 return {
                     "success": False,
-                    "message": "Could not extract images from the PDF"
+                    "message": "No resume text found for this user"
                 }
-                
-        finally:
-            # Clean up the temporary file
-            os.unlink(temp_file_path)
-            
+        else:
+            return {
+                "success": False,
+                "message": f"No profile found for user ID: {user_id}"
+            }
     except Exception as e:
         return {
             "success": False,
-            "message": f"Error processing resume: {str(e)}"
+            "message": f"Error retrieving resume content: {str(e)}"
         }
 
 # @mcp.tool()
