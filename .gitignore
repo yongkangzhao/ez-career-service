@@ -12,4 +12,6 @@ wheels/
 # environment variables
 .env
 
-user_assistance_mcp_debug.log
+*.log
+
+.trunk

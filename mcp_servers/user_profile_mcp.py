@@ -364,7 +364,7 @@ def get_resume_content() -> Dict[str, Any]:
             "message": f"Error processing resume: {str(e)}"
         }
 
-@mcp.tool()
+# @mcp.tool()
 def get_application_details() -> Dict[str, Any]:
     """
     Retrieve comprehensive application details to minimize missing information issues.
@@ -387,8 +387,8 @@ def get_application_details() -> Dict[str, Any]:
         
         # Get additional application preferences if available
         # Note: You may need to create this table in your Supabase database
-        pref_response = supabase.table("application_preferences").select("*").eq("user_id", user_id).execute()
-        preferences = pref_response.data[0] if pref_response.data and len(pref_response.data) > 0 else {}
+        # pref_response = supabase.table("application_preferences").select("*").eq("user_id", user_id).execute()
+        # preferences = pref_response.data[0] if pref_response.data and len(pref_response.data) > 0 else {}
         
         # Get education information
         edu_response = supabase.table("education").select("*").eq("user_id", user_id).execute()
@@ -405,7 +405,7 @@ def get_application_details() -> Dict[str, Any]:
         # Combine all available information for applications
         application_data = {
             "profile": profile,
-            "preferences": preferences,
+            # "preferences": preferences,
             "education": education,
             "experience": experience,
             "skills": skills,

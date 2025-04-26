@@ -42,13 +42,14 @@ except Exception as e:
 mcp = FastMCP("supabase")
 
 @mcp.tool()
-def insert_application(position_title: str, company_name: str) -> Dict[str, Any]:
+def insert_application(position_title: str, company_name: str, link: str) -> Dict[str, Any]:
     """
     Insert a new application record into the applications table.
     
     Args:
         position_title: The title of the position applied for
         company_name: The name of the company applied to
+        link: The link to the job application or company page
         
     Returns:
         A dictionary with insertion status and application info if successful
@@ -70,7 +71,8 @@ def insert_application(position_title: str, company_name: str) -> Dict[str, Any]
         response = supabase.table("applications").insert({
             "user_id": user_id,
             "position_title": position_title,
-            "company_name": company_name
+            "company_name": company_name,
+            "link": link,
         }).execute()
         
         if response.data and len(response.data) > 0:
