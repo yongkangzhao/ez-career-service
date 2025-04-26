@@ -12,4 +12,4 @@ wheels/
 # environment variables
 .env
 
-.log
+*.log
