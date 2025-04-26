@@ -112,28 +112,28 @@ def log_application_issue(
     logger.info(f"Issue details: {issue_details}")
     
     try:
-        # Step 1: Ensure a basic application record exists to satisfy foreign key
-        logger.debug(f"Upserting basic application record for application_id: {application_id}")
-        app_upsert_data = {
-            "id": application_id, # Primary key for upsert
-            "user_id": user_id,
-            "company_name": company,
-            "position_title": position,
-            "status": "applied", # Changed from "issue_logged" to "applied" to match schema constraints
-            "created_at": datetime.now().isoformat(),
-            "notes": f"Auto-generated entry for issue logging: {issue_type}. {issue_details}" # Adding notes to help identify these auto-created entries
-        }
-        try:
-            # Use upsert to either insert or ignore if exists (based on PK 'id')
-            supabase.table("applications").upsert(app_upsert_data).execute()
-            logger.debug(f"Successfully upserted application record for {application_id}")
-        except PostgrestAPIError as app_e:
-            # Log error but proceed to log the issue anyway if possible
-            logger.error(f"Error upserting application record for {application_id}: {app_e}")
-            logger.error(traceback.format_exc())
-        except Exception as app_e_gen:
-            logger.error(f"Unexpected error upserting application record for {application_id}: {app_e_gen}")
-            logger.error(traceback.format_exc())
+        # # Step 1: Ensure a basic application record exists to satisfy foreign key
+        # logger.debug(f"Upserting basic application record for application_id: {application_id}")
+        # app_upsert_data = {
+        #     "id": application_id, # Primary key for upsert
+        #     "user_id": user_id,
+        #     "company_name": company,
+        #     "position_title": position,
+        #     "status": "applied", # Changed from "issue_logged" to "applied" to match schema constraints
+        #     "created_at": datetime.now().isoformat(),
+        #     "notes": f"Auto-generated entry for issue logging: {issue_type}. {issue_details}" # Adding notes to help identify these auto-created entries
+        # }
+        # try:
+        #     # Use upsert to either insert or ignore if exists (based on PK 'id')
+        #     supabase.table("applications").upsert(app_upsert_data).execute()
+        #     logger.debug(f"Successfully upserted application record for {application_id}")
+        # except PostgrestAPIError as app_e:
+        #     # Log error but proceed to log the issue anyway if possible
+        #     logger.error(f"Error upserting application record for {application_id}: {app_e}")
+        #     logger.error(traceback.format_exc())
+        # except Exception as app_e_gen:
+        #     logger.error(f"Unexpected error upserting application record for {application_id}: {app_e_gen}")
+        #     logger.error(traceback.format_exc())
 
         # Step 2: Log the specific issue
         logger.debug("Preparing to insert issue into application_issues table")
