@@ -187,6 +187,7 @@ tool_agents:
         * **`insert_application` on Verified Success REQUIRED.**
         * **Website Restrictions Enforcement.**
       model_settings:
+        truncation: auto
         parallel_tool_calls: false
         temperature: 0.0
         tool_choice: required
