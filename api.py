@@ -35,10 +35,11 @@ from pydantic import BaseModel
 import tempfile
 import fitz  # PyMuPDF
 from openai import OpenAI
+from sentence_transformers import SentenceTransformer
 
 from mcp_server_manager import MCPServerManager
 from tool_agents.orchestrator_agent import create_orchestrator_agent
-from supabase import create_client
+from supabase import create_client, Client
 
 APP_CONFIG_PATH = os.getenv("APP_CONFIG_PATH", "agents_config.yaml")
 
@@ -154,6 +155,18 @@ class ParseResponse(BaseModel):
     markdown: str
 
 
+# Added Pydantic model for the submit-answer request body
+class SubmitAnswerRequest(BaseModel):
+    question_id: str # UUID of the question being answered
+    answer_text: str
+    user_id: str # UUID of the user answering the question
+
+
+class SubmitAnswerResponse(BaseModel):
+    success: bool
+    message: str
+
+
 def create_generic_agent(
     agent_config: Dict[str, Any], mcp_manager: Optional[MCPServerManager]
 ) -> Optional[Agent]:
@@ -250,6 +263,8 @@ app_state: Dict[str, Any] = {
     "tool_agents_with_meta": [],
     "active_tasks": {},  # Stores the asyncio.Task objects
     "task_results": {}, # Stores results/errors keyed by trace_id
+    "embedding_model": None,
+    "supabase_client": None,
 }
 
 
@@ -269,6 +284,31 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         raise RuntimeError(f"Failed to load configuration: {e}") from e
 
+    # --- Initialize Supabase Client for API use ---
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY") # Use the service role key if needed for broader access
+    if not supabase_url or not supabase_key:
+        print("WARNING: SUPABASE_URL or SUPABASE_KEY not set. Supabase client for API will not be initialized.")
+    else:
+        try:
+            app_state["supabase_client"] = create_client(supabase_url, supabase_key)
+            print("INFO: Supabase client for API initialized successfully.")
+            # Optional: Test connection or authentication if needed here
+        except Exception as e:
+            print(f"ERROR: Failed to initialize Supabase client for API: {e}")
+            # Consider whether startup should fail here depending on criticality
+    
+    # --- Initialize Sentence Transformer Model ---
+    try:
+        print("INFO: Loading sentence-transformer model (thenlper/gte-small) for API...")
+        # This might block startup briefly on first download
+        app_state["embedding_model"] = SentenceTransformer('thenlper/gte-small')
+        print("INFO: Sentence-transformer model for API loaded successfully.")
+    except Exception as e:
+        print(f"ERROR: Failed to load sentence-transformer model for API: {e}")
+        # Consider if startup should fail if embedding is critical
+
+    # --- Existing MCP/Agent Initialization ---
     mcp_server_configs = app_config.get("mcp_servers", {})
     tool_agent_definitions = app_config.get("tool_agents", [])
     print(
@@ -326,6 +366,9 @@ async def lifespan(app: FastAPI):
             await manager_instance.__aexit__(None, None, None)
         except Exception as e:
             print(f"ERROR: Exception during MCP manager shutdown: {e}")
+    # Cleanup other resources if needed
+    app_state["supabase_client"] = None
+    app_state["embedding_model"] = None
     print("INFO: Application shutdown complete.")
 
 
@@ -353,6 +396,20 @@ def get_orchestrator() -> Agent:
     if orchestrator is None:
         raise HTTPException(status_code=503, detail="Orchestrator Agent not available.")
     return orchestrator
+
+
+def get_supabase_client() -> Client:
+    client = app_state.get("supabase_client")
+    if client is None:
+        raise HTTPException(status_code=503, detail="Supabase client not initialized")
+    return client
+
+
+def get_embedding_model() -> SentenceTransformer:
+    model = app_state.get("embedding_model")
+    if model is None:
+        raise HTTPException(status_code=503, detail="Embedding model not initialized")
+    return model
 
 
 async def run_agent_task_background(
@@ -645,9 +702,7 @@ async def reprocess_application(
     """
     try:
         # Get the issue details from Supabase
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
-        supabase_client = create_client(supabase_url, supabase_key)
+        supabase_client = get_supabase_client()
         
         response = supabase_client.table("application_issues").select("*").eq("id", payload.issue_id).execute()
         
@@ -759,6 +814,73 @@ async def parse_pdf_to_markdown(file: UploadFile = File(...)):
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+
+# --- New API Endpoint for Submitting Answers ---
+@app.post("/submit-answer", response_model=SubmitAnswerResponse)
+async def submit_answer_endpoint(
+    payload: SubmitAnswerRequest,
+    supabase: Client = Depends(get_supabase_client),
+    embedding_model: SentenceTransformer = Depends(get_embedding_model)
+):
+    """
+    API endpoint for the frontend to submit a user's answer.
+    Generates embedding and upserts into the user_answers table.
+    """
+    print(f"INFO: Received submit_answer request for question_id: {payload.question_id}, user_id: {payload.user_id}")
+    
+    if not payload.answer_text:
+        print(f"WARNING: Empty answer text provided for question_id: {payload.question_id}. Skipping save.")
+        # Return success, as it's not a server error, but indicate nothing was saved.
+        return SubmitAnswerResponse(success=True, message="Answer text was empty, nothing saved.")
+        
+    try:
+        # 1. Generate embedding
+        print(f"DEBUG: Generating embedding for answer text...")
+        embedding = embedding_model.encode(payload.answer_text).tolist()
+        print(f"DEBUG: Embedding generated.")
+
+        # 2. Prepare data for upsert
+        upsert_data = {
+            "user_id": payload.user_id,
+            "question_id": payload.question_id,
+            "answer_text": payload.answer_text,
+            "embedding": embedding,
+            # created_at/updated_at will be handled by DB defaults/triggers
+        }
+        print(f"DEBUG: Upserting data to user_answers...")
+
+        # 3. Upsert data into user_answers table
+        response = supabase.table("user_answers").upsert(upsert_data).execute()
+        print(f"DEBUG: Supabase upsert response received.")
+
+        # 4. Check response and return status
+        if hasattr(response, 'error') and response.error:
+             print(f"ERROR: Supabase upsert failed during submit_answer: {response.error}")
+             message = f"Failed to save answer: {str(response.error)}"
+             # Attempt to parse PostgrestError details if available
+             if isinstance(response.error, PostgrestAPIError):
+                 message = f"Database error saving answer: {response.error.message}"
+             raise HTTPException(status_code=500, detail=message)
+        elif hasattr(response, 'data') and not response.data and not response.error:
+            print("WARNING: Supabase upsert executed but returned no data (check RLS?). Assuming success.")
+            return SubmitAnswerResponse(success=True, message="Answer saved/updated successfully (no data returned).")
+        else:
+            print(f"INFO: Answer saved/updated successfully for question_id: {payload.question_id}")
+            return SubmitAnswerResponse(success=True, message="Answer saved/updated successfully.")
+
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to let FastAPI handle them
+        raise http_exc
+    except Exception as e:
+        print(f"ERROR: Unexpected error in submit_answer_endpoint: {e}")
+        traceback.print_exc()
+        # Check for specific embedding errors
+        if "embedding_model" in locals() and hasattr(e, "message") and "encode" in str(e):
+             print(f"ERROR: Error during sentence-transformer encoding: {e}")
+             raise HTTPException(status_code=500, detail=f"Failed to generate text embedding: {e}")
+        # Generic internal server error for other exceptions
+        raise HTTPException(status_code=500, detail=f"Internal server error processing answer: {str(e)}")
 
 
 if __name__ == "__main__":

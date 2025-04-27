@@ -17,3 +17,5 @@ wheels/
 .trunk
 
 user_assistance_mcp_debug.log
+
+.vite

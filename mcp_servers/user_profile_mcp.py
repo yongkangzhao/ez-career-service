@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from supabase import create_client
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
+import re # Added for sanitizing filename
 
 # Load environment variables
 load_dotenv()
@@ -111,60 +112,97 @@ def get_current_user_profile() -> Dict[str, Any]:
             "message": f"Error retrieving current user profile: {str(e)}"
         }
 
+# Helper function to sanitize filename
+def sanitize_filename(name: str) -> str:
+    # Remove invalid characters and replace spaces with underscores
+    name = re.sub(r'[\/*?":<>|]', '', name) # Remove invalid chars
+    name = re.sub(r'\s+', '_', name) # Replace spaces with underscore
+    return name
+
 @mcp.tool()
 def get_resume_path() -> Dict[str, Any]:
     """
-    Retrieve the user's resume URL from the Supabase profile table.
+    Retrieve the user's resume URL, download it, and save it locally 
+    with a stable, professional filename.
     
     Args:
         user_id: The ID of the user whose resume to retrieve
         
     Returns:
-        A dictionary containing the resume URL and status information
+        A dictionary containing the local resume path and status information
     """
+    # --- Get User's Full Name --- 
+    name_info = get_full_name() # Call existing tool internally
+    user_full_name = "User"
+    if name_info.get("success") and name_info.get("full_name"):
+        user_full_name = name_info["full_name"]
+    sanitized_name = sanitize_filename(user_full_name)
+    
+    # --- Define Download Path --- 
+    # Ensure a directory exists for downloads (e.g., in the service's CWD)
+    download_dir = os.path.join(os.getcwd(), "resume_downloads")
+    os.makedirs(download_dir, exist_ok=True)
+    # Construct the stable filename
+    stable_filename = f"{sanitized_name}_Resume.pdf"
+    local_resume_path = os.path.join(download_dir, stable_filename)
+    print(f"DEBUG: Target local resume path: {local_resume_path}")
+
     try:
-        # Query the user's profile from the database
-        response = supabase.table("profiles").select("resume_url").eq("user_id", user_id).execute()
+        # --- Query Resume URL --- 
+        print(f"DEBUG: Querying resume URL for user_id: {user_id}")
+        response_url = supabase.table("profiles").select("resume_url").eq("user_id", user_id).execute()
         
-        if response.data and len(response.data) > 0:
-            resume_url = response.data[0].get("resume_url")
-            if resume_url:
-                # download the resume file
-                # save it to a temporary location
-                # return the resume path
-
-                #download the resume file
-                response = requests.get(resume_url)
-                if response.status_code != 200:
-                    return {
-                        "success": False,
-                        "message": f"Failed to download resume: HTTP {response.status_code}"
-                    }
-                # Save PDF to a temporary file that will be persisted with meaningful name
-                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
-                    temp_file.write(response.content)
-                    temp_file_path = temp_file.name
-
-                # Return the resume URL
-                # Clean up the temporary file
-
-                return {
-                    "success": True,
-                    "resume_path": temp_file_path,
-                    "resume_url": resume_url,
-                    "message": "Resume URL retrieved successfully"
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": "No resume found for this user"
-                }
-        else:
-            return {
+        if not response_url.data or len(response_url.data) == 0:
+             return {
                 "success": False,
                 "message": f"No profile found for user ID: {user_id}"
             }
+
+        resume_url = response_url.data[0].get("resume_url")
+        if not resume_url:
+            return {
+                "success": False,
+                "message": "No resume URL found for this user in profile"
+            }
+        
+        print(f"DEBUG: Found resume URL: {resume_url}")
+
+        # --- Download Resume --- 
+        print(f"DEBUG: Downloading resume from {resume_url}...")
+        response_download = requests.get(resume_url, stream=True) # Use stream=True for potentially large files
+        response_download.raise_for_status() # Raises HTTPError for bad responses (4xx or 5xx)
+        
+        # --- Save Resume Locally --- 
+        print(f"DEBUG: Saving resume to {local_resume_path}...")
+        with open(local_resume_path, 'wb') as f:
+            for chunk in response_download.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f"DEBUG: Resume saved successfully.")
+
+        # --- Return Success --- 
+        return {
+            "success": True,
+            "resume_path": local_resume_path, # Return the stable path
+            "resume_url": resume_url, # Still useful to return the original URL
+            "message": "Resume downloaded and saved successfully with stable name."
+        }
+            
+    except requests.exceptions.RequestException as e:
+        print(f"ERROR: Failed to download resume from URL {resume_url}: {e}")
+        return {
+            "success": False,
+            "message": f"Failed to download resume: {str(e)}"
+        }
+    except IOError as e:
+        print(f"ERROR: Failed to save resume to {local_resume_path}: {e}")
+        return {
+            "success": False,
+            "message": f"Failed to save downloaded resume: {str(e)}"
+        }
     except Exception as e:
+        print(f"ERROR: Unexpected error retrieving resume path: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "message": f"Error retrieving resume: {str(e)}"

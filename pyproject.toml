@@ -16,6 +16,7 @@ dependencies = [
     "braintrust>=0.0.201",
     "weave>=0.51.44",
     "python-multipart>=0.0.12",
+    "sentence-transformers>=2.2.2",
 ]
 
 [build-system]
