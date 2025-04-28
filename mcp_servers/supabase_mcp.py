@@ -44,8 +44,8 @@ except Exception as e:
     logger.error(f"Failed to create Supabase client: {e}")
     logger.error(traceback.format_exc())
     # Create a dummy client to prevent startup errors
-    from unittest.mock import MagicMock
-    supabase = MagicMock()
+    # from unittest.mock import MagicMock
+    # supabase = MagicMock()
     logger.warning("Using mock Supabase client due to initialization error")
 
 
@@ -157,32 +157,31 @@ def insert_application(position_title: str, company_name: str, link: str) -> Dic
 # --- Functions moved from user_assistance_mcp --- 
 
 @mcp.tool() # Use the supabase mcp instance
-def find_existing_answer(question_text: str, similarity_threshold: float = 0.8) -> Dict[str, Any]:
+def find_existing_answer(question_text: str) -> Dict[str, Any]:
     """
     Searches for existing answers to semantically similar questions in the database.
     Generates a 384d embedding using sentence-transformers (gte-small) 
     and calls a Supabase RPC function to perform the native vector search.
+    Returns a string of the question/issue and the corresponding answer from the user.
 
     Args:
         question_text: The new question text to find answers for.
-        similarity_threshold: Minimum cosine similarity score to consider a match.
 
     Returns:
-        Dictionary containing 'found' (boolean) and 'answer_text' (string, if found).
+        Dictionary containing 'found' (boolean) and 'question_answer_text' (string, if found).
     """
     logger.info(f"find_existing_answer called for question: {question_text}")
 
+    MATCH_TYPES = ["missing_information"]
+    SIMILARITY_THRESHOLD = 0.6
+
     if not DEFAULT_USER_ID:
         logger.error("Cannot find answer: Default User ID is not set.")
-        return {"found": False, "answer_text": None, "message": "User ID not set"}
-
-    if not supabase or isinstance(supabase, MagicMock):
-        logger.error("Cannot find answer: Supabase client is not initialized or is a mock.")
-        return {"found": False, "answer_text": None, "message": "Supabase client not available"}
+        return {"found": False, "question_answer_text": None, "message": "User ID not set"}
         
     if not embedding_model_st:
         logger.error("Cannot find answer: Sentence Transformer model failed to load.")
-        return {"found": False, "answer_text": None, "message": "Embedding model not available"}
+        return {"found": False, "question_answer_text": None, "message": "Embedding model not available"}
         
     try:
         # 1. Generate 384d embedding using sentence-transformers (gte-small)
@@ -190,22 +189,23 @@ def find_existing_answer(question_text: str, similarity_threshold: float = 0.8) 
         query_embedding = embedding_model_st.encode(question_text).tolist()
 
         # 2. Call Supabase RPC with the generated embedding
-        rpc_function_name = "match_user_answers_384"
+        rpc_function_name = "match_application_issues_384"
         logger.debug(f"Calling Supabase RPC '{rpc_function_name}' for user {DEFAULT_USER_ID}")
         response = supabase.rpc(
             rpc_function_name,
             {
                 "p_user_id": DEFAULT_USER_ID,
                 "query_embedding": query_embedding,
-                "match_threshold": similarity_threshold,
-                "match_count": 1, 
+                "match_threshold": SIMILARITY_THRESHOLD,
+                "match_count": 3, 
+                "match_types": MATCH_TYPES
             },
         ).execute()
         logger.debug(f"Supabase RPC response: {response}")
 
         if response.data and len(response.data) > 0:
             best_match = response.data[0]
-            if 'answer_text' in best_match:
+            if 'issue_details' in best_match and 'resolution_note' in best_match:
                 similarity = best_match.get('similarity', 'N/A')
                 try:
                     similarity_str = f"{float(similarity):.4f}"
@@ -215,109 +215,109 @@ def find_existing_answer(question_text: str, similarity_threshold: float = 0.8) 
                 logger.info(f"Found similar answer with similarity {similarity_str}")
                 return {
                     "found": True,
-                    "answer_text": best_match["answer_text"],
+                    "question_answer_text": "Question: " + best_match["issue_details"] + " " + "Answer: " + best_match["resolution_note"],
                     "message": f"Found existing answer with similarity {similarity_str}"
                 }
             else:
-                 logger.warning("Found match via RPC, but 'answer_text' key missing in response data.")
-                 return {"found": False, "answer_text": None, "message": "Match found but response format unexpected"}
+                 logger.warning("Found match via RPC, but either 'issue_details' or 'resolution_note' key missing in response data.")
+                 return {"found": False, "answquestion_answer_texter_text": None, "message": "Match found but response format unexpected"}
         else:
             logger.info("No sufficiently similar answer found via RPC.")
-            return {"found": False, "answer_text": None, "message": "No similar answer found"}
+            return {"found": False, "question_answer_text": None, "message": "No similar answer found"}
 
     except PostgrestAPIError as e:
         if f'relation "{rpc_function_name}" does not exist' in e.message or f'function {rpc_function_name}' in e.message:
              logger.error(f"Supabase RPC Error: '{rpc_function_name}' function not found. Please ensure the migration was applied.")
-             return {"found": False, "answer_text": None, "message": f"Required database function '{rpc_function_name}' is missing."}
+             return {"found": False, "question_answer_text": None, "message": f"Required database function '{rpc_function_name}' is missing."}
         logger.error(f"Supabase API Error searching for answer: {e}")
         logger.error(f"Details: {e.details}, Code: {e.code}, Hint: {e.hint}, Message: {e.message}")
         logger.error(traceback.format_exc())
-        return {"found": False, "answer_text": None, "message": f"Supabase API Error: {e.message}"}
+        return {"found": False, "question_answer_text": None, "message": f"Supabase API Error: {e.message}"}
     except Exception as e:
         logger.error(f"Unexpected Exception in find_existing_answer: {e}")
         logger.error(traceback.format_exc())
         if "embedding_model_st" in locals() and hasattr(e, "message") and "encode" in str(e):
              logger.error(f"Error during sentence-transformer encoding: {e}")
-             return {"found": False, "answer_text": None, "message": f"Failed to generate text embedding: {e}"}
-        return {"found": False, "answer_text": None, "message": f"Unexpected error: {str(e)}"}
+             return {"found": False, "question_answer_text": None, "message": f"Failed to generate text embedding: {e}"}
+        return {"found": False, "question_answer_text": None, "message": f"Unexpected error: {str(e)}"}
 
-@mcp.tool() # Use the supabase mcp instance
-def ask_question(question_text: str) -> Dict[str, Any]:
-    """
-    Sends a question to the user and stores it for later retrieval of the answer.
-    Uses the default authenticated user ID.
+# @mcp.tool() # Use the supabase mcp instance
+# def ask_question(question_text: str) -> Dict[str, Any]:
+#     """
+#     Sends a question to the user and stores it for later retrieval of the answer.
+#     Uses the default authenticated user ID.
 
-    Args:
-        question_text: The question to ask the user.
+#     Args:
+#         question_text: The question to ask the user.
 
-    Returns:
-        Dictionary with the status and the ID of the asked question.
-    """
-    logger.info(f"ask_question called with question: {question_text}")
+#     Returns:
+#         Dictionary with the status and the ID of the asked question.
+#     """
+#     logger.info(f"ask_question called with question: {question_text}")
 
-    if not DEFAULT_USER_ID:
-        logger.error("Cannot ask question: Default User ID is not set.")
-        return {
-            "success": False,
-            "message": "Cannot ask question: Default User ID is not set.",
-        }
+#     if not DEFAULT_USER_ID:
+#         logger.error("Cannot ask question: Default User ID is not set.")
+#         return {
+#             "success": False,
+#             "message": "Cannot ask question: Default User ID is not set.",
+#         }
         
-    if not supabase or isinstance(supabase, MagicMock):
-         logger.error("Cannot ask question: Supabase client is not initialized or is a mock.")
-         return {
-            "success": False,
-            "message": "Cannot ask question: Supabase client not available.",
-        }
+#     if not supabase or isinstance(supabase, MagicMock):
+#          logger.error("Cannot ask question: Supabase client is not initialized or is a mock.")
+#          return {
+#             "success": False,
+#             "message": "Cannot ask question: Supabase client not available.",
+#         }
 
-    try:
-        question_id = str(uuid.uuid4())
-        logger.debug(f"Generated question_id: {question_id}")
+#     try:
+#         question_id = str(uuid.uuid4())
+#         logger.debug(f"Generated question_id: {question_id}")
 
-        insert_data = {
-            "id": question_id,
-            "question_text": question_text,
-            # Assuming 'user_id' column exists in 'questions' table and should be populated
-            "user_id": DEFAULT_USER_ID,
-        }
-        logger.debug(f"Inserting question data into 'questions' table: {insert_data}")
+#         insert_data = {
+#             "id": question_id,
+#             "question_text": question_text,
+#             # Assuming 'user_id' column exists in 'questions' table and should be populated
+#             "user_id": DEFAULT_USER_ID,
+#         }
+#         logger.debug(f"Inserting question data into 'questions' table: {insert_data}")
 
-        # Ensure the 'questions' table schema in Supabase matches:
-        # Columns expected: id (uuid, pk), question_text (text), user_id (uuid, fk), created_at (timestampz)
-        response = supabase.table("questions").insert(insert_data).execute()
-        logger.debug(f"Supabase insert response for questions: {response}")
+#         # Ensure the 'questions' table schema in Supabase matches:
+#         # Columns expected: id (uuid, pk), question_text (text), user_id (uuid, fk), created_at (timestampz)
+#         response = supabase.table("questions").insert(insert_data).execute()
+#         logger.debug(f"Supabase insert response for questions: {response}")
 
-        if response.data and len(response.data) > 0:
-            logger.info(f"Question stored successfully with ID: {question_id}")
-            # TODO: Implement actual sending of the question to the frontend/user
-            # For now, we just log it and store it.
-            return {
-                "success": True,
-                "question_id": question_id,
-                "message": "Question logged successfully and is pending user answer.",
-            }
-        else:
-            logger.warning(f"Question possibly stored (ID: {question_id}), but no data returned in response (check RLS?).")
-            return {
-                "success": True, # Assume success if no exception
-                "question_id": question_id,
-                "message": "Question logged, but no confirmation data returned. Pending user answer.",
-            }
+#         if response.data and len(response.data) > 0:
+#             logger.info(f"Question stored successfully with ID: {question_id}")
+#             # TODO: Implement actual sending of the question to the frontend/user
+#             # For now, we just log it and store it.
+#             return {
+#                 "success": True,
+#                 "question_id": question_id,
+#                 "message": "Question logged successfully and is pending user answer.",
+#             }
+#         else:
+#             logger.warning(f"Question possibly stored (ID: {question_id}), but no data returned in response (check RLS?).")
+#             return {
+#                 "success": True, # Assume success if no exception
+#                 "question_id": question_id,
+#                 "message": "Question logged, but no confirmation data returned. Pending user answer.",
+#             }
 
-    except PostgrestAPIError as e:
-        logger.error(f"Supabase API Error storing question: {e}")
-        logger.error(f"Details: {e.details}, Code: {e.code}, Hint: {e.hint}, Message: {e.message}")
-        logger.error(traceback.format_exc())
-        return {
-            "success": False,
-            "message": f"Supabase API Error storing question: {e.message}.",
-        }
-    except Exception as e:
-        logger.error(f"Unexpected Exception in ask_question: {e}")
-        logger.error(traceback.format_exc())
-        return {
-            "success": False,
-            "message": f"Unexpected error storing question: {str(e)}.",
-        }
+#     except PostgrestAPIError as e:
+#         logger.error(f"Supabase API Error storing question: {e}")
+#         logger.error(f"Details: {e.details}, Code: {e.code}, Hint: {e.hint}, Message: {e.message}")
+#         logger.error(traceback.format_exc())
+#         return {
+#             "success": False,
+#             "message": f"Supabase API Error storing question: {e.message}.",
+#         }
+#     except Exception as e:
+#         logger.error(f"Unexpected Exception in ask_question: {e}")
+#         logger.error(traceback.format_exc())
+#         return {
+#             "success": False,
+#             "message": f"Unexpected error storing question: {str(e)}.",
+#         }
 
 # --- End moved functions --- 
 

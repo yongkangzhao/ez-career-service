@@ -148,7 +148,7 @@ class TaskResultResponse(BaseModel):
 
 class ReprocessRequest(BaseModel):
     issue_id: str
-    additional_info: Dict[str, Any] = {}
+    additional_info: str
 
 
 class ParseResponse(BaseModel):
@@ -558,8 +558,8 @@ async def cancel_orchestration_endpoint(payload: CancelRequest):
         if trace_id not in app_state["active_tasks"]:
             print(f"DEBUG: Task {trace_id} not found in active_tasks")
             return CancelResponse(
-                success=False, 
-                message=f"No active task found with trace_id: {trace_id}"
+                success=True, 
+                message=f"No active task found with trace_id, assuming it was already cancelled: {trace_id}"
             )
         
         # Add to cancellation queue for background processing
@@ -644,8 +644,8 @@ async def force_kill_endpoint(payload: ForceKillRequest):
         print(f"DEBUG: Active tasks: {active_tasks}")
         print(f"DEBUG: Could not find task with trace_id: {trace_id}")
         return ForceKillResponse(
-            success=False,
-            message=f"No active task found with trace_id: {trace_id}"
+            success=True,
+            message=f"No active task found with trace_id, assuming it was already cancelled: {trace_id}"
         )
     
     try:
@@ -723,16 +723,38 @@ async def get_task_result(trace_id: str):
 async def reprocess_application(
     payload: ReprocessRequest,
     background_tasks: BackgroundTasks,
-    orchestrator: Agent = Depends(get_orchestrator)
+    orchestrator: Agent = Depends(get_orchestrator),
+    supabase: Client = Depends(get_supabase_client)
 ):
     """
     Reprocess an application that previously had issues
     """
     try:
-        # Get the issue details from Supabase
-        supabase_client = get_supabase_client()
+        # 1. Authenticate using environment variables (similar to get_resume_suggestions)
+        # Get default credentials from environment
+        DEFAULT_EMAIL = os.getenv("DEFAULT_EMAIL", "test@gmail.com")
+        DEFAULT_PASSWORD = os.getenv("DEFAULT_PASSWORD", "password")
         
-        response = supabase_client.table("application_issues").select("*").eq("id", payload.issue_id).execute()
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": DEFAULT_EMAIL,
+                "password": DEFAULT_PASSWORD
+            })
+            
+            if not auth_response.user:
+                raise HTTPException(status_code=401, detail="Authentication failed with default credentials")
+            
+            user_id = auth_response.user.id
+            print(f"INFO: Successfully authenticated as {auth_response.user.email}, user ID: {user_id}")
+            
+        except Exception as auth_error:
+            print(f"ERROR: Authentication failed: {auth_error}")
+            traceback.print_exc()
+            raise HTTPException(status_code=401, detail=f"Authentication failed with default credentials: {str(auth_error)}")
+        
+        # Get the issue details from Supabase
+        print(f"DEBUG: Getting issue details for {payload.issue_id}")
+        response = supabase.table("application_issues").select("*").eq("id", payload.issue_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Issue not found")
@@ -746,16 +768,9 @@ async def reprocess_application(
         task = (
             f"Reprocess application for {issue['position']} at {issue['company']}. "
             f"Previous issue was: {issue['issue_type']}: {issue['issue_details']}. "
-            f"Additional information has been provided: {json.dumps(payload.additional_info)}. "
+            f"Additional information has been provided: {payload.additional_info}. "
             f"Focus specifically on completing this application with the new information."
         )
-        
-        # Update the issue as resolved
-        supabase_client.table("application_issues").update({
-            "status": "resolved",
-            "resolved_at": supabase_client.table("application_issues").sql("now()"),
-            "resolution_note": f"Reprocessing initiated with additional information: {json.dumps(payload.additional_info)}"
-        }).eq("id", payload.issue_id).execute()
         
         # Create a new task for the agent
         agent_task = asyncio.create_task(
@@ -771,6 +786,7 @@ async def reprocess_application(
         
     except Exception as e:
         print(f"ERROR: Failed to reprocess application: {str(e)}")
+        traceback.print_exc()  # Add traceback for better debugging
         raise HTTPException(status_code=500, detail=f"Error reprocessing application: {str(e)}")
 
 
