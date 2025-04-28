@@ -54,7 +54,7 @@ mcp_servers:
 tool_agents:
   - name: BrowserToolAgent # This name WILL be used as the tool_name
     model: gpt-4.1
-    mcp_server_key: "playwright_mcp user_profile_mcp supabase_mcp user_assistance_mcp"
+    mcp_server_key: "playwright_mcp user_profile_mcp supabase_mcp"
     # Renamed field for tool description override:
     description: "Use this Agent to control a web browser: navigate, screenshot, click, input text etc."
     parameters:
@@ -150,8 +150,8 @@ tool_agents:
         * `get_resume_content`: Provides full text content of the user's resume.
         * `get_resume_path`: Provides path to **assumed most recent resume file**.
         * `insert_application` (takes `job_title`, `company_name`).
-        * `find_existing_answer` (from UserAssistanceAgent): Takes `question_text`. Searches for previously answered similar questions.
-        * `ask_question` (from UserAssistanceAgent): Takes `question_text`. Logs a question for the user to answer.
+        * `find_existing_answer` (from supabase_mcp): Takes `question_text`. Searches for previously answered similar questions.
+        * `ask_question` (from supabase_mcp): Takes `question_text`. Logs a question for the user to answer.
 
         **Inputs (From Orchestrator):**
         * `goal`: High-level objective string OR
