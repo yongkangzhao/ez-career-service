@@ -184,6 +184,17 @@ class SuggestionsResponse(BaseModel):
     other_industries: List[str]
 
 
+# New class for the embedding endpoint
+class EmbeddingRequest(BaseModel):
+    text: str  # The text to generate an embedding for
+
+
+class EmbeddingResponse(BaseModel):
+    embedding: List[float]  # The generated vector embedding
+    dimensions: int  # The dimensionality of the embedding
+    model: str  # The model used to generate the embedding
+
+
 def create_generic_agent(
     agent_config: Dict[str, Any], mcp_manager: Optional[MCPServerManager]
 ) -> Optional[Agent]:
@@ -1032,6 +1043,39 @@ async def get_resume_suggestions(
         print(f"ERROR: Unexpected error in get_resume_suggestions: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error analyzing resume: {str(e)}")
+
+
+# New embedding endpoint
+@app.post("/embedding", response_model=EmbeddingResponse)
+async def generate_embedding(
+    payload: EmbeddingRequest,
+    embedding_model: SentenceTransformer = Depends(get_embedding_model)
+):
+    """
+    Generates a vector embedding for the provided text using the 'thenlper/gte-small' model.
+    
+    Args:
+        payload: Contains the text to generate an embedding for
+        
+    Returns:
+        A dictionary with the embedding vector, dimensions, and model information
+    """
+    try:
+        # Generate embedding using the same model as in supabase_mcp.py
+        embedding_vector = embedding_model.encode(payload.text).tolist()
+        
+        return EmbeddingResponse(
+            embedding=embedding_vector,
+            dimensions=len(embedding_vector),  # Should be 384 for gte-small
+            model="thenlper/gte-small"
+        )
+    except Exception as e:
+        print(f"ERROR: Failed to generate embedding: {e}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate embedding: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
