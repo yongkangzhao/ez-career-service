@@ -167,6 +167,23 @@ class SubmitAnswerResponse(BaseModel):
     message: str
 
 
+# --- New models for the suggestions endpoint ---
+class SuggestionsRequest(BaseModel):
+    # Removed email and password fields
+    pass
+
+
+class SuggestionsResponse(BaseModel):
+    suggested_job_titles: List[str]
+    recommended_experience_level: str
+    recommended_salary_range: str
+    skills: List[str]
+    recommended_locations: List[str]
+    other_locations: List[str]
+    recommended_industries: List[str]
+    other_industries: List[str]
+
+
 def create_generic_agent(
     agent_config: Dict[str, Any], mcp_manager: Optional[MCPServerManager]
 ) -> Optional[Agent]:
@@ -881,6 +898,140 @@ async def submit_answer_endpoint(
              raise HTTPException(status_code=500, detail=f"Failed to generate text embedding: {e}")
         # Generic internal server error for other exceptions
         raise HTTPException(status_code=500, detail=f"Internal server error processing answer: {str(e)}")
+
+
+@app.post("/suggestions", response_model=SuggestionsResponse)
+async def get_resume_suggestions(
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Analyzes a user's resume to provide personalized suggestions for job preferences
+    including job titles, experience level, salary range, skills, locations, and industries.
+    Uses default credentials from environment variables.
+    """
+    print(f"INFO: Received resume suggestions request")
+    
+    try:
+        # 1. Authenticate using environment variables
+        # Get default credentials from environment
+        DEFAULT_EMAIL = os.getenv("DEFAULT_EMAIL", "test@gmail.com")
+        DEFAULT_PASSWORD = os.getenv("DEFAULT_PASSWORD", "password")
+        
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": DEFAULT_EMAIL,
+                "password": DEFAULT_PASSWORD
+            })
+            
+            if not auth_response.user:
+                raise HTTPException(status_code=401, detail="Authentication failed with default credentials")
+            
+            user_id = auth_response.user.id
+            
+        except Exception as auth_error:
+            print(f"ERROR: Authentication failed: {auth_error}")
+            traceback.print_exc()
+            raise HTTPException(status_code=401, detail=f"Authentication failed with default credentials: {str(auth_error)}")
+        
+        # 2. Fetch the user's resume text from Supabase - check in profiles table
+        response = supabase.table("profiles").select("resume_text").eq("user_id", user_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="User profile not found or resume not available")
+        
+        resume_text = response.data[0].get("resume_text")
+        if not resume_text:
+            raise HTTPException(status_code=400, detail="No resume text available for analysis")
+                
+        # 3. Initialize OpenAI client for analysis
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+        
+        client = OpenAI(api_key=openai_api_key)
+        
+        # 4. Define default lists for locations and industries
+        default_locations = [
+            "San Francisco Bay Area", "New York City", "Seattle", "Boston", "Dallas", 
+            "Chicago", "Los Angeles", "Remote (US)", "Remote (Global)"
+        ]
+        
+        default_industries = [
+            "Technology", "Finance", "Healthcare", "Education", "E-commerce", 
+            "Media & Entertainment", "Government", "Manufacturing", "Telecommunications", "Retail"
+        ]
+        
+        # 5. Call GPT to analyze the resume and extract suggestions
+        prompt = f"""
+        Analyze the following resume and extract relevant information for job search preferences:
+
+        RESUME:
+        {resume_text}
+
+        Based on this resume, please provide:
+        1. A list of 3-5 suggested job titles that match the person's experience and skills
+        2. The most appropriate experience level from: "entry_level", "mid_level", "senior", "lead", "executive"
+        3. A recommended salary range from: "under_50k", "50k_75k", "75k_100k", "100k_150k", "150k_200k", "over_200k"
+        4. A list of specific skills (technical and soft) extracted from the resume
+        5. Locations mentioned in the resume or that would be relevant based on the person's experience
+        6. Industries the person has worked in or that would be relevant based on their experience
+
+        Format your response as a valid JSON object with the following structure:
+        {{
+            "suggested_job_titles": ["title1", "title2", ...],
+            "recommended_experience_level": "one_of_the_levels_listed_above",
+            "recommended_salary_range": "one_of_the_ranges_listed_above",
+            "skills": ["skill1", "skill2", ...],
+            "recommended_locations": ["location1", "location2", ...],
+            "recommended_industries": ["industry1", "industry2", ...]
+        }}
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": "You are a professional career advisor specializing in extracting career-relevant information from resumes and providing job search suggestions."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0
+        )
+        
+        # 6. Parse the response
+        try:
+            analysis_result = json.loads(response.choices[0].message.content)
+            
+            # 7. Process locations
+            recommended_locations = analysis_result.get("recommended_locations", [])
+            other_locations = [loc for loc in default_locations if loc not in recommended_locations]
+            
+            # 8. Process industries
+            recommended_industries = analysis_result.get("recommended_industries", [])
+            other_industries = [ind for ind in default_industries if ind not in recommended_industries]
+            
+            # 9. Build the response
+            return SuggestionsResponse(
+                suggested_job_titles=analysis_result.get("suggested_job_titles", []),
+                recommended_experience_level=analysis_result.get("recommended_experience_level", "entry_level"),
+                recommended_salary_range=analysis_result.get("recommended_salary_range", "50k_75k"),
+                skills=analysis_result.get("skills", []),
+                recommended_locations=recommended_locations,
+                other_locations=other_locations,
+                recommended_industries=recommended_industries,
+                other_industries=other_industries
+            )
+            
+        except json.JSONDecodeError as e:
+            print(f"ERROR: Failed to parse GPT response: {e}")
+            raise HTTPException(status_code=500, detail="Failed to parse resume analysis results")
+            
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions
+        raise http_exc
+    except Exception as e:
+        print(f"ERROR: Unexpected error in get_resume_suggestions: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error analyzing resume: {str(e)}")
 
 
 if __name__ == "__main__":
