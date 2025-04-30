@@ -12,7 +12,28 @@ This service utilizes a cutting-edge **multi-agent architecture**, moving beyond
 * **How it Works:** The user interacts with a dedicated frontend application. The frontend communicates with this backend API, typically initiating tasks via the `/orchestrate` endpoint. The backend's Orchestrator Agent then delegates tasks to specialized agents (like the BrowserToolAgent) which use various tools (MCP Servers) to interact with web browsers, databases (Supabase), and user profile data to find and apply for jobs autonomously.
 * **Key Benefit:** **Save hours daily** during your job search. Enable application to potentially **hundreds of jobs per day**, even while you're away. Discover unexplored opportunities based on your profile analysis.
 
-## Architecture Diagram
+## ✨ Key Features & Innovations
+
+* **🚀 Full Job Application Automation:** End-to-end process handling – from searching job boards (like LinkedIn) to navigating application forms, filling details factually, uploading resumes, verifying submission, and logging success.
+* **🤖 Sophisticated Multi-Agent System:** Utilizes specialized agents (Orchestrator, Browser, Planning, User Assistance) working collaboratively via the **OpenAI Agents SDK** and the **Agent-as-Tool** pattern. (**Innovation**)
+* **🧠 Dynamic Planning & Execution:** Employs agents capable of dynamic, multi-step planning and execution, adapting to the complexities of online applications and handling errors gracefully.
+* **🌐 Intelligent Browser Automation via Playwright MCP:** Leverages the robust **Playwright** framework through its MCP server for precise browser interaction (navigation, clicks, form filling, file uploads), ensuring reliable automation on complex web applications. (**Microsoft Technology Alignment**, **Innovation**)
+    * *Note:* Playwright MCP was chosen over alternatives like `Browser_use` for its superior control, tracing capabilities, and reliable feature implementation (e.g., file uploads).
+* **🛡️ Responsible AI & Human-in-the-Loop:**
+    * **Fact-Based Filling:** Agents are constrained to use only factual data retrieved from the user's profile and resume via dedicated tools.
+    * **No Hallucination:** Explicitly designed *not* to invent answers for factual fields (e.g., experience levels, specific dates).
+    * **User Feedback Loop:** When required factual information is missing, the system logs a specific question for the user via the `UserAssistanceAgent` and the `/submit-answer` API allows the user (via the frontend) to provide the answer. (**Usability**, **Responsible AI**)
+* **🔍 RAG for Personalized & Consistent Applications:**
+    * Integrates a **Retrieval-Augmented Generation (RAG)** system using **Sentence Transformers** (`thenlper/gte-small`) embeddings and **direct Supabase RPC function calls** (`match_application_issues_384`).
+    * This allows the agent to find and reuse previously provided user answers for similar factual questions encountered in new applications, ensuring consistency and reducing redundant user prompts. (**Innovation**, **Usability**)
+* **💾 Supabase Backend Integration:** Extensive use of Supabase for storing user profiles, resume text/URLs, application tracking data, logged issues requiring user attention, user answers with embeddings, and user notifications.
+* **⚙️ Centralized YAML Configuration:** Easily define and manage agents, their instructions, models, and required MCP server connections via `agents_config.yaml`.
+* **🧩 Extensible Architecture:** Designed for adding new specialized agents (e.g., specific job board integrations, enhanced resume parsing) and tools with minimal code changes for standard patterns.
+* **⚡ Asynchronous & Scalable:** Built on **FastAPI** and `asyncio` for high performance and concurrent operation.
+* **📊 Rich Supporting API:** Includes endpoints for task management (status, cancel, kill, results), PDF-to-Markdown conversion (`/parse`), resume-based job suggestions (`/suggestions`), direct text embedding (`/embedding`), and submitting user answers (`/submit-answer`).
+
+## Architecture Overview
+
 ```mermaid
 graph TB
 
@@ -114,31 +135,7 @@ graph TB
     FE -- /submit-answer --> API
     FE -- /suggestions --> API
     FE -- /parse --> API
-
-
 ```
-
-## ✨ Key Features & Innovations
-
-* **🚀 Full Job Application Automation:** End-to-end process handling – from searching job boards (like LinkedIn) to navigating application forms, filling details factually, uploading resumes, verifying submission, and logging success.
-* **🤖 Sophisticated Multi-Agent System:** Utilizes specialized agents (Orchestrator, Browser, Planning, User Assistance) working collaboratively via the **OpenAI Agents SDK** and the **Agent-as-Tool** pattern. (**Innovation**)
-* **🧠 Dynamic Planning & Execution:** Employs agents capable of dynamic, multi-step planning and execution, adapting to the complexities of online applications and handling errors gracefully.
-* **🌐 Intelligent Browser Automation via Playwright MCP:** Leverages the robust **Playwright** framework through its MCP server for precise browser interaction (navigation, clicks, form filling, file uploads), ensuring reliable automation on complex web applications. (**Microsoft Technology Alignment**, **Innovation**)
-    * *Note:* Playwright MCP was chosen over alternatives like `Browser_use` for its superior control, tracing capabilities, and reliable feature implementation (e.g., file uploads).
-* **🛡️ Responsible AI & Human-in-the-Loop:**
-    * **Fact-Based Filling:** Agents are constrained to use only factual data retrieved from the user's profile and resume via dedicated tools.
-    * **No Hallucination:** Explicitly designed *not* to invent answers for factual fields (e.g., experience levels, specific dates).
-    * **User Feedback Loop:** When required factual information is missing, the system logs a specific question for the user via the `UserAssistanceAgent` and the `/submit-answer` API allows the user (via the frontend) to provide the answer. (**Usability**, **Responsible AI**)
-* **🔍 RAG for Personalized & Consistent Applications:**
-    * Integrates a **Retrieval-Augmented Generation (RAG)** system using **Sentence Transformers** (`thenlper/gte-small`) embeddings and **direct Supabase RPC function calls** (`match_application_issues_384`).
-    * This allows the agent to find and reuse previously provided user answers for similar factual questions encountered in new applications, ensuring consistency and reducing redundant user prompts. (**Innovation**, **Usability**)
-* **💾 Supabase Backend Integration:** Extensive use of Supabase for storing user profiles, resume text/URLs, application tracking data, logged issues requiring user attention, user answers with embeddings, and user notifications.
-* **⚙️ Centralized YAML Configuration:** Easily define and manage agents, their instructions, models, and required MCP server connections via `agents_config.yaml`.
-* **🧩 Extensible Architecture:** Designed for adding new specialized agents (e.g., specific job board integrations, enhanced resume parsing) and tools with minimal code changes for standard patterns.
-* **⚡ Asynchronous & Scalable:** Built on **FastAPI** and `asyncio` for high performance and concurrent operation.
-* **📊 Rich Supporting API:** Includes endpoints for task management (status, cancel, kill, results), PDF-to-Markdown conversion (`/parse`), resume-based job suggestions (`/suggestions`), direct text embedding (`/embedding`), and submitting user answers (`/submit-answer`).
-
-## Architecture Overview
 
 The system follows a decoupled architecture:
 
@@ -157,6 +154,7 @@ The system follows a decoupled architecture:
     * Web Browser (Chrome via CDP)
     * Supabase Database
     * OpenAI API
+
 
 ## Technology Stack
 
