@@ -62,13 +62,11 @@ graph TB
         SUPA_MCP[supabase_mcp Internal-Python]
         PROF_MCP[user_profile_mcp Internal-Python]
         ASSIST_MCP[user_assistance_mcp Internal-Python]
-        MEM_MCP[memory_mcp External-npx]
 
         MCPs --> PLAY_MCP
         MCPs --> SUPA_MCP
         MCPs --> PROF_MCP
         MCPs --> ASSIST_MCP
-        MCPs --> MEM_MCP
     end
 
     subgraph ExternalResources [External Resources]
