@@ -6,7 +6,7 @@
 
 ## Overview
 
-This service utilizes a cutting-edge **multi-agent architecture**, moving beyond simple scripts to provide intelligent, adaptive automation. Instead of a single AI, a team of specialized agents collaborates, orchestrated by a central planner, embodying the powerful **Agent-as-Tool** pattern.
+This service utilizes a cutting-edge **multi-agent architecture**, moving beyond simple scripts to provide intelligent, adaptive automation. Instead of a single AI, a team of specialized agents collaborates, orchestrated by a central agent, embodying the powerful **Agent-as-Tool** pattern. Allowing very flexible and extensible agent interactions, this architecture is designed to handle complex tasks with ease.
 
 * **Goal:** To fully automate the job search and application process, primarily targeting platforms like LinkedIn and associated Applicant Tracking Systems (ATS).
 * **How it Works:** The user interacts with a dedicated frontend application. The frontend communicates with this backend API, typically initiating tasks via the `/orchestrate` endpoint. The backend's Orchestrator Agent then delegates tasks to specialized agents (like the BrowserToolAgent) which use various tools (MCP Servers) to interact with web browsers, databases (Supabase), and user profile data to find and apply for jobs autonomously.
@@ -154,6 +154,14 @@ The system follows a decoupled architecture:
     * Web Browser (Chrome via CDP)
     * Supabase Database
     * OpenAI API
+
+
+### Key Benefits of Agent-as-Tool Architecture
+
+* **Separation of Concerns:** Each agent is responsible for a specific task, such as browsing, planning, or user assistance. This allows for better organization and maintainability of the codebase.
+* **Flexibility:** New agents can be added or existing ones modified without affecting the entire system. This gives the ability to control the complexity of the system and allows for easy updates or changes to specific agents.
+* **Scalability:** The system can handle long running tasks with extensive context with ease, since the tool agents are stateless, lots of context will be forgotten as the task progresses, while the orchestrator agent can keep track of the task state and progress, dramatically reducing the context size.
+
 
 
 ## Technology Stack
