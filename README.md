@@ -141,8 +141,11 @@ The system follows a decoupled architecture:
 
 1.  **Frontend UI** (Separate Repository - React/Electron): The user interacts here.
 2.  **Backend API (This Repo - FastAPI):** Handles requests from the frontend.
-3.  **Orchestrator Agent:** Receives tasks from the API.
-4.  **Planning Agent:** (Optional) Breaks down complex tasks.
+3.  **Orchestrator Agent:** Receives tasks from the API, and then collaborates with other agents to complete the task. It manages the task state and progress.
+    * **Agent Factory:** Creates agents based on the configuration in `agents_config.yaml`.
+    * **Agent Manager:** Manages the lifecycle of agents, including starting/stopping them.
+    * **Task Manager:** Manages the task state and progress. Allows for long and complex tasks to be broken down into smaller sub-tasks.
+4.  **Planning Agent:** (Optional) Breaks down complex tasks, and a way to control the complexity of the task.
 5.  **Tool Agents:** (`BrowserToolAgent`, `UserAssistanceAgent`) Execute specific sub-tasks.
 6.  **MCP Servers:** Provide specialized tools/capabilities accessed via the Model Context Protocol:
     * `playwright_mcp`: Browser control via Playwright/CDP.
