@@ -15,10 +15,14 @@ fi
 
 # 1) Capture Chrome's output so we can grab the DevTools ws:// URL
 OUT=$(mktemp)
+# Use a persistent Chrome user data directory
+CHROME_DATA_DIR="$HOME/.ez-career-chrome-debug-profile"
+# Create it if it doesn't exist
+mkdir -p "$CHROME_DATA_DIR"
 trap 'rm -f "$OUT"; pkill -P $$ >/dev/null 2>&1' EXIT
 
-# 2) Launch Chrome with your default profile, in the background
-"$CHROME" --remote-debugging-port=$REMOTE_PORT 2>&1 | tee "$OUT" &
+# 2) Launch Chrome with remote debugging enabled and a persistent user data directory
+"$CHROME" --remote-debugging-port=$REMOTE_PORT --user-data-dir="$CHROME_DATA_DIR" 2>&1 | tee "$OUT" &
 CH_PID=$!
 
 # 3) Wait until Chrome prints the DevTools endpoint
