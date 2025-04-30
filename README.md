@@ -158,8 +158,6 @@ The system follows a decoupled architecture:
     * Supabase Database
     * OpenAI API
 
-*(Note: A detailed architecture diagram is planned).*
-
 ## Technology Stack
 
 * **Backend:** Python 3.12+, FastAPI, Uvicorn
@@ -336,7 +334,6 @@ The system supports adding new agents easily if they follow the standard `Agent`
 * Explore Multi-Modal LLM integration for richer resume/job description understanding.
 * Add more robust error handling, state management, and recovery mechanisms.
 * Optimize for higher throughput and scalability.
-* Create a detailed Architecture Diagram.
 * Expand API for finer-grained control and status reporting.
 * Agent Trace to Training Data Generation.
 * Custom Agent specific Small Language Model (LLM) fine-tuning.
