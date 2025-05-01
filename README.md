@@ -194,7 +194,7 @@ The system follows a decoupled architecture:
 * **OpenAI API Key:** Required for LLM calls.
 * **Supabase Account:** Required for database storage.
     * You will need your Supabase Project URL and Service Role Key (or Anon Key, depending on your RLS policies).
-    * **Important:** Ensure your Supabase database schema is set up correctly, including the tables (`profiles`, `applications`, `application_issues`, `questions`, `user_answers`, `notifications`, etc.) and the required RPC function (`match_application_issues_384`) for the RAG feature. Refer to database setup documentation (if available) or schema definitions.
+    * **Important:** Ensure your Supabase database schema is set up correctly, including the tables (`profiles`, `applications`, `application_issues`, `questions`, `user_answers`, `notifications`, etc.) and the required RPC function (`match_application_issues_384`) for the RAG feature. Refer to database setup documentation in [frontend](https://github.com/yumozi/ez-career-frontend).
 
 ### 3. Project Installation & Configuration
 
