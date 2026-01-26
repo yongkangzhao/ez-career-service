@@ -1,0 +1,305 @@
+manifest:
+  version: "0.1.2"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: yongkangzhao/ez-career-service
+    source: https://github.com/yongkangzhao/ez-career-service
+    branch: main
+    commit: "101e6bdd"
+    scope: [api.py, mcp_server_manager.py, tool_agents/orchestrator_agent.py]
+  issued:
+    by: A2AS.org
+    at: '2026-01-26T16:10:48Z'
+  signatures:
+    digest: sha256:TBMNxhFoYGjfzY-peqRL3XM0PKMLuJOHBO1m4pNqxbo
+    key: ed25519:zaSsic5NvZLBWg7396pzFK9AvjLTejGciFVyqe1fNuU
+    sig: ed25519:ssdXIlKLgS1xJBSd_u0IEqPelLdHpK3xPbHe9AZ-ncqUM-J-M2-HhVl2ks82S-6xdm0IbtHkxa-7w6p4ZsNbDw
+
+agents:
+  agent_instance:
+    type: instance
+    params:
+      function: create_generic_agent
+  orchestrator:
+    type: instance
+    models: [orchestrator_agent_config.get]
+    tools: [tools_list]
+    params:
+      function: create_orchestrator_agent
+      name: orchestrator_agent_config.get(name, TaskOrchestratorAgent)
+
+models:
+  orchestrator_agent_config.get:
+    type: function
+    agents: [orchestrator]
+
+tools:
+  tools_list:
+    type: variable
+    agents: [orchestrator]
+    params:
+      dynamic: "True"
+
+mcp:
+  context.0:
+    type: network
+    params:
+      class: MCPServerSse
+      name: server_name
+      config: server_params
+      instance: context
+  context.1:
+    type: process
+    params:
+      class: MCPServerStdio
+      name: server_name
+      config: server_params
+      instance: context
+      function: _connect_server
+
+imports:
+  Agent: agents.Agent
+  Any: typing.Any
+  asynccontextmanager: contextlib.asynccontextmanager
+  asyncio: asyncio
+  BackgroundTasks: fastapi.BackgroundTasks
+  BaseModel: pydantic.BaseModel
+  BraintrustTracingProcessor: braintrust.wrappers.openai.BraintrustTracingProcessor
+  Client: supabase.Client
+  CORSMiddleware: fastapi.middleware.cors.CORSMiddleware
+  create_client: supabase.create_client
+  create_orchestrator_agent: tool_agents.orchestrator_agent.create_orchestrator_agent
+  Depends: fastapi.Depends
+  Dict: typing.Dict
+  FastAPI: fastapi.FastAPI
+  File: fastapi.File
+  fitz: fitz
+  function_tool: agents.function_tool
+  HTTPException: fastapi.HTTPException
+  init_logger: braintrust.init_logger
+  ItemHelpers: agents.ItemHelpers
+  json: json
+  List: typing.List
+  load_dotenv: dotenv.load_dotenv
+  MCPServerManager: mcp_server_manager.MCPServerManager
+  MCPServerSse: agents.mcp.MCPServerSse
+  MCPServerStdio: agents.mcp.MCPServerStdio
+  MessageOutputItem: agents.MessageOutputItem
+  ModelSettings: agents.ModelSettings
+  OpenAI: openai.OpenAI
+  Optional: typing.Optional
+  os: os
+  queue: queue
+  Runner: agents.Runner
+  SentenceTransformer: sentence_transformers.SentenceTransformer
+  set_trace_processors: agents.set_trace_processors
+  tempfile: tempfile
+  threading: threading
+  time: time
+  trace: agents.trace
+  traceback: traceback
+  Tuple: typing.Tuple
+  Union: typing.Union
+  UploadFile: fastapi.UploadFile
+  uuid: uuid
+  uvicorn: uvicorn
+  weave: weave
+  WeaveTracingProcessor: weave.integrations.openai_agents.openai_agents.WeaveTracingProcessor
+  yaml: yaml
+
+functions:
+  __aenter__:
+    type: async
+    module: mcp_server_manager
+    args: [self]
+  __aexit__:
+    type: async
+    module: mcp_server_manager
+    args: [self, exc_type, exc_val, exc_tb]
+  __init__:
+    type: sync
+    module: mcp_server_manager
+    args: [self, server_configs]
+  _connect_server:
+    type: async
+    module: mcp_server_manager
+    args: [self, server_key, config]
+  cancel_orchestration_endpoint:
+    type: async
+    module: api
+    args: [payload]
+  cancellation_monitor:
+    type: sync
+    module: api
+  check_specific_task:
+    type: async
+    module: api
+    args: [payload]
+  create_generic_agent:
+    type: sync
+    module: api
+    args: [agent_config, mcp_manager]
+    params:
+      returns: Optional[Agent]
+  create_orchestrator_agent:
+    type: sync
+    module: tool_agents.orchestrator_agent
+    args: [orchestrator_agent_config, tool_agent_configs]
+    params:
+      returns: Agent
+  create_tool_agent:
+    type: sync
+    module: tool_agents.orchestrator_agent
+    args: [agent, tool_name, tool_description, max_turn]
+    params:
+      returns: Agent
+  force_kill_endpoint:
+    type: async
+    module: api
+    args: [payload]
+  generate_embedding:
+    type: async
+    module: api
+    args: [payload, embedding_model]
+  get_embedding_model:
+    type: sync
+    module: api
+    params:
+      returns: SentenceTransformer
+  get_mcp_manager:
+    type: sync
+    module: api
+    params:
+      returns: MCPServerManager
+  get_orchestrator:
+    type: sync
+    module: api
+    params:
+      returns: Agent
+  get_resume_suggestions:
+    type: async
+    module: api
+    args: [supabase]
+  get_server:
+    type: sync
+    module: mcp_server_manager
+    args: [self, server_key]
+    params:
+      returns: AnyMCPServer
+  get_supabase_client:
+    type: sync
+    module: api
+    params:
+      returns: Client
+  get_task_result:
+    type: async
+    module: api
+    args: [trace_id]
+  get_task_status:
+    type: async
+    module: api
+  health_check:
+    type: async
+    module: api
+  lifespan:
+    type: async
+    module: api
+    args: [app]
+  load_and_create_agents_from_defs:
+    type: sync
+    module: api
+    args: [tool_, manager]
+    params:
+      returns: List[Tuple]
+  parse_pdf_to_markdown:
+    type: async
+    module: api
+    args: [file]
+  reprocess_application:
+    type: async
+    module: api
+    args: [payload, background_tasks, orchestrator, supabase]
+  run_agent:
+    type: async
+    module: tool_agents.orchestrator_agent
+    args: [query]
+    params:
+      returns: str
+  run_agent_task_background:
+    type: async
+    module: api
+    args: [orchestrator, task_str, trace_id]
+  run_orchestration_endpoint:
+    type: async
+    module: api
+    args: [payload, background_tasks, orchestrator]
+  submit_answer_endpoint:
+    type: async
+    module: api
+    args: [payload, supabase, embedding_model]
+
+variables:
+  APP_CONFIG_PATH:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  DEFAULT_EMAIL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  DEFAULT_PASSWORD:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  DEV_MODE:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  HOST:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  OPENAI_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  PORT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  SUPABASE_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+  SUPABASE_URL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [api]
+
+files:
+  .pdf:
+    type: literal
+    actions: [write]
+    params:
+      caller: [tempfile.NamedTemporaryFile]
+      delete: "False"
+  APP_CONFIG_PATH:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open, yaml.safe_load]
+      alias: [f]
+  temp_file_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [fitz.open, os.unlink]
